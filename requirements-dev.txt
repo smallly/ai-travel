@@ -1,0 +1,9 @@
+# Development dependencies
+pytest==7.4.0
+pytest-flask==1.2.0
+pytest-cov==4.1.0
+
+# Optional dependencies for enhanced features
+gunicorn==21.2.0  # Production WSGI server
+psycopg2-binary==2.9.7  # PostgreSQL support (optional)
+redis==4.6.0  # Redis support for caching (optional)
