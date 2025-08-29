@@ -1,27 +1,27 @@
 import React, { useState, useEffect, useLayoutEffect, useCallback, useRef } from 'react';
-import { chatApi, locationApi } from './services/api';
+import { BrowserRouter as Router, Routes, Route, useNavigate, useParams } from 'react-router-dom';
+import { chatApi } from './services/api';
+import RealMap from './components/RealMap';
+import TripDetailPage from './components/TripDetailPage';
+import PlanningTripDetail from './components/PlanningTripDetail';
+import CompletedTripDetail from './components/CompletedTripDetail';
 import { 
   MessageCircle, 
   Map, 
   User, 
   Send, 
   ArrowLeft,
-  Star,
   MapPin,
   Calendar,
   Clock,
   Plus,
-  Settings,
-  LogOut,
   Eye,
   EyeOff,
-  Phone,
   Mail,
   Trash2,
   Edit3,
   Camera,
   Check,
-  X,
   Maximize,
   Minimize,
   Lock,
@@ -56,16 +56,30 @@ interface TravelPlan {
   duration: string;
   locations: number;
   image: string;
-  status: 'upcoming' | 'completed';
+  status: 'planning' | 'upcoming' | 'completed';
   province?: string;
   centerCoordinates?: {
     lat: number;
     lng: number;
   };
   destination?: string;
+  attractionList?: {
+    id: string;
+    name: string;
+    address: string;
+    image: string;
+    description: string;
+    coordinates?: {
+      lat: number;
+      lng: number;
+    };
+  }[];
+  createdAt?: string;
+  startDate?: string;
+  endDate?: string;
 }
 
-type Screen = 'login' | 'register' | 'main' | 'editProfile';
+type Screen = 'login' | 'register' | 'main' | 'editProfile' | 'tripDetail';
 type Tab = 'chat' | 'itinerary' | 'profile';
 
 // 最简单的FormInput，暂时不用ref，只测试不失焦功能
@@ -162,13 +176,13 @@ function App() {
   const [currentItineraryTab, setCurrentItineraryTab] = useState<'pending' | 'planning' | 'completed'>('pending');
   const [showPassword, setShowPassword] = useState(false);
   const [isMapFullscreen, setIsMapFullscreen] = useState(false);
-  const [loginForm, setLoginForm] = useState({ email: '', password: '' });
-  const [registerForm, setRegisterForm] = useState({ 
-    email: '', 
-    password: '', 
-    confirmPassword: '',
-    verificationCode: ''
-  });
+  // const [loginForm, setLoginForm] = useState({ email: '', password: '' });
+  // const [registerForm, setRegisterForm] = useState({ 
+  //   email: '', 
+  //   password: '', 
+  //   confirmPassword: '',
+  //   verificationCode: ''
+  // });
   const [userProfile, setUserProfile] = useState({
     nickname: '用户',
     email: 'user@example.com',
@@ -180,6 +194,7 @@ function App() {
   });
   const [showAbout, setShowAbout] = useState(false);
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
+  const [selectedTrip, setSelectedTrip] = useState<TravelPlan | null>(null);
   const [toast, setToast] = useState<{ message: string; visible: boolean }>({ 
     message: '', 
     visible: false 
@@ -203,7 +218,8 @@ function App() {
   const [isTyping, setIsTyping] = useState(false);
   const [addedAttractions, setAddedAttractions] = useState<Set<string>>(new Set());
   const [currentConversationId, setCurrentConversationId] = useState<string | null>(null);
-  const [conversations, setConversations] = useState<any[]>([]);
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const [conversations, setConversations] = useState<unknown[]>([]);
   
   // 聊天滚动容器引用
   const chatScrollRef = useRef<HTMLDivElement>(null);
@@ -345,7 +361,7 @@ function App() {
     }
   ]);
 
-  // 示例数据
+  // 示例数据 - 更新包含更多状态和详细信息
   const travelPlans: TravelPlan[] = [
     {
       id: '1',
@@ -356,7 +372,36 @@ function App() {
       status: 'upcoming',
       province: '山东省',
       centerCoordinates: { lat: 36.0661, lng: 120.3694 },
-      destination: '青岛市'
+      destination: '青岛市',
+      startDate: '2024-03-15',
+      endDate: '2024-03-17',
+      createdAt: '2024-03-01',
+      attractionList: [
+        {
+          id: '1-1',
+          name: '青岛栈桥',
+          address: '山东省青岛市市南区太平路12号',
+          image: 'https://images.pexels.com/photos/2901209/pexels-photo-2901209.jpeg?auto=compress&cs=tinysrgb&w=400',
+          description: '青岛标志性景点，百年历史的海上桥梁',
+          coordinates: { lat: 36.0581, lng: 120.3203 }
+        },
+        {
+          id: '1-2',
+          name: '八大关风景区',
+          address: '山东省青岛市市南区山海关路',
+          image: 'https://images.pexels.com/photos/2901209/pexels-photo-2901209.jpeg?auto=compress&cs=tinysrgb&w=400',
+          description: '欧式建筑群，青岛最美的地方',
+          coordinates: { lat: 36.0458, lng: 120.3331 }
+        },
+        {
+          id: '1-3',
+          name: '青岛啤酒博物馆',
+          address: '山东省青岛市市北区登州路56-1号',
+          image: 'https://images.pexels.com/photos/2901209/pexels-photo-2901209.jpeg?auto=compress&cs=tinysrgb&w=400',
+          description: '了解青岛啤酒历史，品尝新鲜啤酒',
+          coordinates: { lat: 36.0785, lng: 120.3661 }
+        }
+      ]
     },
     {
       id: '2',
@@ -366,7 +411,28 @@ function App() {
       image: 'https://images.pexels.com/photos/1591373/pexels-photo-1591373.jpeg?auto=compress&cs=tinysrgb&w=400',
       status: 'completed',
       centerCoordinates: { lat: 39.9163, lng: 116.3972 },
-      destination: '北京故宫'
+      destination: '北京故宫',
+      startDate: '2024-02-10',
+      endDate: '2024-02-11',
+      createdAt: '2024-02-01',
+      attractionList: [
+        {
+          id: '2-1',
+          name: '故宫博物院',
+          address: '北京市东城区景山前街4号',
+          image: 'https://images.pexels.com/photos/1591373/pexels-photo-1591373.jpeg?auto=compress&cs=tinysrgb&w=400',
+          description: '明清两代的皇家宫殿，世界文化遗产',
+          coordinates: { lat: 39.9163, lng: 116.3972 }
+        },
+        {
+          id: '2-2',
+          name: '天安门广场',
+          address: '北京市东城区东长安街',
+          image: 'https://images.pexels.com/photos/1591373/pexels-photo-1591373.jpeg?auto=compress&cs=tinysrgb&w=400',
+          description: '世界最大的城市广场，中国象征',
+          coordinates: { lat: 39.9042, lng: 116.4074 }
+        }
+      ]
     },
     {
       id: '3',
@@ -374,10 +440,51 @@ function App() {
       duration: '1天',
       locations: 6,
       image: 'https://images.pexels.com/photos/2901209/pexels-photo-2901209.jpeg?auto=compress&cs=tinysrgb&w=400',
-      status: 'upcoming',
+      status: 'planning',
       province: '浙江省',
       centerCoordinates: { lat: 30.2741, lng: 120.1551 },
-      destination: '杭州西湖'
+      destination: '杭州西湖',
+      createdAt: '2024-03-10',
+      attractionList: [
+        {
+          id: '3-1',
+          name: '西湖断桥残雪',
+          address: '浙江省杭州市西湖区白堤',
+          image: 'https://images.pexels.com/photos/2901209/pexels-photo-2901209.jpeg?auto=compress&cs=tinysrgb&w=400',
+          description: '西湖十景之一，白娘子传说发生地',
+          coordinates: { lat: 30.2634, lng: 120.1439 }
+        },
+        {
+          id: '3-2',
+          name: '雷峰塔',
+          address: '浙江省杭州市西湖区南山路15号',
+          image: 'https://images.pexels.com/photos/2901209/pexels-photo-2901209.jpeg?auto=compress&cs=tinysrgb&w=400',
+          description: '西湖标志性古塔，白娘子传说经典场景',
+          coordinates: { lat: 30.2319, lng: 120.1477 }
+        }
+      ]
+    },
+    {
+      id: '4',
+      title: '成都美食之旅',
+      duration: '4天3晚',
+      locations: 12,
+      image: 'https://images.pexels.com/photos/2901209/pexels-photo-2901209.jpeg?auto=compress&cs=tinysrgb&w=400',
+      status: 'planning',
+      province: '四川省',
+      centerCoordinates: { lat: 30.5728, lng: 104.0668 },
+      destination: '成都市',
+      createdAt: '2024-03-12',
+      attractionList: [
+        {
+          id: '4-1',
+          name: '宽窄巷子',
+          address: '四川省成都市青羊区同仁路以东长顺街以西',
+          image: 'https://images.pexels.com/photos/2901209/pexels-photo-2901209.jpeg?auto=compress&cs=tinysrgb&w=400',
+          description: '成都历史文化街区，体验老成都风情',
+          coordinates: { lat: 30.6759, lng: 104.0570 }
+        }
+      ]
     }
   ];
 
@@ -645,7 +752,7 @@ function App() {
         };
         setMessages(prev => [...prev, errorMessage]);
       }
-    } catch (error) {
+    } catch (error: unknown) {
       // 网络错误处理
       const errorMessage: Message = {
         id: (Date.now() + 1).toString(),
@@ -680,6 +787,18 @@ function App() {
       avatar: editProfile.avatar || userProfile.avatar
     });
     setCurrentScreen('main');
+  };
+
+  // 查看行程详情
+  const handleViewTripDetail = (trip: TravelPlan) => {
+    setSelectedTrip(trip);
+    setCurrentScreen('tripDetail');
+  };
+
+  // 关闭行程详情
+  const handleCloseTripDetail = () => {
+    setCurrentScreen('main');
+    setSelectedTrip(null);
   };
 
   // 退出登录处理
@@ -1138,54 +1257,19 @@ function App() {
       {currentItineraryTab === 'pending' && (
         <>
           {/* 地图区域 */}
-          <div className={`relative bg-blue-50 ${isMapFullscreen ? 'fixed inset-0 z-50' : 'h-64'} overflow-hidden transition-all duration-300`}>
-            {/* 地图背景 */}
-            <div className="absolute inset-0 bg-gradient-to-br from-blue-100 to-green-100">
-              {/* 模拟地图网格 */}
-              <div className="absolute inset-0 opacity-20">
-                <div className="grid grid-cols-8 grid-rows-8 h-full w-full">
-                  {Array.from({ length: 64 }).map((_, i) => (
-                    <div key={i} className="border border-gray-300"></div>
-                  ))}
-                </div>
-              </div>
-              
-              {/* 模拟道路 */}
-              <div className="absolute top-1/3 left-0 right-0 h-2 bg-gray-300 opacity-60"></div>
-              <div className="absolute top-2/3 left-0 right-0 h-2 bg-gray-300 opacity-60"></div>
-              <div className="absolute top-0 bottom-0 left-1/4 w-2 bg-gray-300 opacity-60"></div>
-              <div className="absolute top-0 bottom-0 right-1/4 w-2 bg-gray-300 opacity-60"></div>
-              
-              {/* 景点标记 */}
-              {myLocations.map((location) => (
-                <div 
-                  key={location.id}
-                  className="absolute transform -translate-x-1/2 -translate-y-1/2"
-                  style={{ 
-                    left: `${location.coordinates.x}%`, 
-                    top: `${location.coordinates.y}%` 
-                  }}
-                >
-                  <div className="relative">
-                    <div className="w-8 h-8 bg-purple-500 rounded-full flex items-center justify-center shadow-lg animate-bounce">
-                      <MapPin className="w-4 h-4 text-white" />
-                    </div>
-                    <div className="absolute -bottom-8 left-1/2 transform -translate-x-1/2 bg-white px-2 py-1 rounded shadow-md text-xs whitespace-nowrap">
-                      {location.name}
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
+          <div className={`relative ${isMapFullscreen ? 'fixed inset-0 z-50' : 'h-64'} overflow-hidden transition-all duration-300`}>
+            {/* 真实地图组件 */}
+            <RealMap 
+              locations={myLocations}
+              className="absolute inset-0 w-full h-full"
+              onLocationClick={(location) => {
+                // 点击地点标记时的处理
+                console.log('点击了地点:', location.name);
+              }}
+            />
             
             {/* 地图控制按钮 */}
-            <div className="absolute top-4 right-4 flex flex-col gap-2">
-              <button className="w-10 h-10 bg-white rounded-full shadow-md flex items-center justify-center hover:bg-gray-50 transition-colors">
-                <Plus className="w-5 h-5 text-gray-600" />
-              </button>
-              <button className="w-10 h-10 bg-white rounded-full shadow-md flex items-center justify-center hover:bg-gray-50 transition-colors">
-                <span className="text-gray-600 text-lg">−</span>
-              </button>
+            <div className="absolute top-4 right-4 flex flex-col gap-2 z-10">
               <button 
                 onClick={() => setIsMapFullscreen(!isMapFullscreen)}
                 className="w-10 h-10 bg-white rounded-full shadow-md flex items-center justify-center hover:bg-gray-50 transition-colors"
@@ -1196,7 +1280,7 @@ function App() {
             
             {/* 全屏状态下的返回按钮 */}
             {isMapFullscreen && (
-              <div className="absolute top-4 left-4">
+              <div className="absolute top-4 left-4 z-10">
                 <button 
                   onClick={() => setIsMapFullscreen(false)}
                   className="w-10 h-10 bg-white rounded-full shadow-md flex items-center justify-center hover:bg-gray-50 transition-colors"
@@ -1205,11 +1289,9 @@ function App() {
                 </button>
               </div>
             )}
-            
 
-            
             {/* 查看地图按钮 */}
-            <div className="absolute bottom-4 left-4">
+            <div className="absolute bottom-4 left-4 z-10">
               <button 
                 onClick={() => {
                   // 如果有地点，导航到第一个地点或所有地点的中心
@@ -1281,11 +1363,59 @@ function App() {
       {/* 规划中页面 */}
       {currentItineraryTab === 'planning' && (
         <div className="flex-1 p-4 overflow-y-auto custom-scrollbar">
-          <div className="text-center py-12">
-            <div className="w-16 h-16 bg-gray-50 rounded-full flex items-center justify-center mx-auto mb-4 shadow-sm">
-              <Calendar className="w-8 h-8 text-gray-400" />
-            </div>
-            <p className="text-gray-500">暂无规划中的行程</p>
+          <div className="space-y-3">
+            {travelPlans
+              .filter(plan => plan.status === 'planning')
+              .map((plan) => (
+                <div 
+                  key={plan.id} 
+                  className="bg-gray-50 rounded-2xl p-4 shadow-sm cursor-pointer hover:bg-gray-100 transition-colors"
+                  onClick={() => handleViewTripDetail(plan)}
+                >
+                  <div className="flex items-center gap-3 mb-3">
+                    <img
+                      src={plan.image}
+                      alt={plan.title}
+                      className="w-12 h-12 rounded-xl object-cover"
+                    />
+                    <div className="flex-1">
+                      <h4 className="font-medium text-gray-800">{plan.title}</h4>
+                      <p className="text-sm text-gray-500">{plan.duration} · {plan.locations}个地点</p>
+                      <p className="text-xs text-gray-400 mt-1">创建于 {plan.createdAt}</p>
+                    </div>
+                    <div className="w-12 h-12 bg-blue-100 rounded-xl flex items-center justify-center">
+                      <Clock className="w-6 h-6 text-blue-500" />
+                    </div>
+                  </div>
+                  
+                  {/* 查看地图按钮 */}
+                  <div className="flex justify-center mt-3">
+                    <button 
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        navigateToLocation(
+                          plan.destination || plan.title, 
+                          plan.centerCoordinates
+                        );
+                      }}
+                      className="bg-white text-purple-600 px-4 py-2 rounded-full flex items-center gap-2 text-sm font-medium shadow-md border border-purple-200 hover:bg-purple-50 transition-colors"
+                      title={`导航到${plan.destination || plan.title}`}
+                    >
+                      <Map className="w-4 h-4" />
+                      查看地图
+                    </button>
+                  </div>
+                </div>
+              ))}
+            
+            {travelPlans.filter(plan => plan.status === 'planning').length === 0 && (
+              <div className="text-center py-12">
+                <div className="w-16 h-16 bg-gray-50 rounded-full flex items-center justify-center mx-auto mb-4 shadow-sm">
+                  <Calendar className="w-8 h-8 text-gray-400" />
+                </div>
+                <p className="text-gray-500">暂无规划中的行程</p>
+              </div>
+            )}
           </div>
         </div>
       )}
@@ -1297,7 +1427,11 @@ function App() {
             {travelPlans
               .filter(plan => plan.status === 'completed')
               .map((plan) => (
-                <div key={plan.id} className="bg-gray-50 rounded-2xl p-4 shadow-sm">
+                <div 
+                  key={plan.id} 
+                  className="bg-gray-50 rounded-2xl p-4 shadow-sm cursor-pointer hover:bg-gray-100 transition-colors"
+                  onClick={() => handleViewTripDetail(plan)}
+                >
                   <div className="flex items-center gap-3 mb-3">
                     <img
                       src={plan.image}
@@ -1307,6 +1441,7 @@ function App() {
                     <div className="flex-1">
                       <h4 className="font-medium text-gray-800">{plan.title}</h4>
                       <p className="text-sm text-gray-500">{plan.duration} · {plan.locations}个地点</p>
+                      <p className="text-xs text-gray-400 mt-1">{plan.startDate} - {plan.endDate}</p>
                     </div>
                     <div className="w-12 h-12 bg-green-100 rounded-xl flex items-center justify-center">
                       <Check className="w-6 h-6 text-green-500" />
@@ -1316,10 +1451,13 @@ function App() {
                   {/* 查看地图按钮 */}
                   <div className="flex justify-center mt-3">
                     <button 
-                      onClick={() => navigateToLocation(
-                        plan.destination || plan.title, 
-                        plan.centerCoordinates
-                      )}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        navigateToLocation(
+                          plan.destination || plan.title, 
+                          plan.centerCoordinates
+                        );
+                      }}
                       className="bg-white text-purple-600 px-4 py-2 rounded-full flex items-center gap-2 text-sm font-medium shadow-md border border-purple-200 hover:bg-purple-50 transition-colors"
                       title={`导航到${plan.destination || plan.title}`}
                     >
@@ -1528,6 +1666,15 @@ function App() {
         <div className="fixed top-4 left-1/2 transform -translate-x-1/2 bg-black bg-opacity-80 text-white px-4 py-2 rounded-lg text-sm z-50 animate-fade-in">
           {toast.message}
         </div>
+      )}
+
+      {/* 行程详情页面 */}
+      {currentScreen === 'tripDetail' && selectedTrip && (
+        <TripDetailPage 
+          trip={selectedTrip}
+          onBack={handleCloseTripDetail}
+          onNavigate={navigateToLocation}
+        />
       )}
     </div>
   );
