@@ -193,15 +193,7 @@ const RealMap: React.FC<RealMapProps> = ({ locations, className, onLocationClick
                 locate: false
               }));
               
-              // 添加全屏控件到右下角
-              mapInstance.addControl(new window.AMap.ControlBar({
-                position: {
-                  bottom: '10px',
-                  right: '10px'
-                },
-                showZoomBar: false,
-                showControlButton: true
-              }));
+              // 全屏控件已移除（按用户要求）
               
               console.log('🛠️ 地图控件添加成功');
             } catch (controlError) {
@@ -215,7 +207,10 @@ const RealMap: React.FC<RealMapProps> = ({ locations, className, onLocationClick
 
           } catch (err) {
             console.error('❌ 地图初始化失败:', err);
-            setError(err instanceof Error ? err.message : '地图加载失败');
+            const errorMessage = err instanceof Error && err.message.includes('网络连接问题') 
+              ? '地图服务暂时无法连接，请检查网络设置' 
+              : (err instanceof Error ? err.message : '地图加载失败');
+            setError(errorMessage);
             setIsLoading(false);
           }
         };
@@ -427,17 +422,55 @@ const RealMap: React.FC<RealMapProps> = ({ locations, className, onLocationClick
       )}
       
       {error && (
-        <div className="absolute inset-0 flex items-center justify-center bg-red-50 z-10">
-          <div className="text-center px-6">
-            <div className="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-3">
-              <MapPin className="w-6 h-6 text-red-500" />
+        <div className="absolute inset-0 flex flex-col bg-gradient-to-br from-gray-50 to-gray-100 z-10">
+          {/* 简化地图展示区域 */}
+          <div className="flex-1 relative overflow-hidden">
+            {/* 地图背景 */}
+            <div className="absolute inset-0 bg-gradient-to-b from-blue-100 to-green-100 opacity-50"></div>
+            
+            {/* 模拟地点标记 */}
+            {locations.map((location, index) => (
+              <div
+                key={location.id}
+                className="absolute transform -translate-x-1/2 -translate-y-1/2 z-10"
+                style={{
+                  left: `${25 + (index * 20) % 60}%`,
+                  top: `${30 + (index * 15) % 40}%`
+                }}
+              >
+                <div className="relative">
+                  <div className="w-6 h-6 bg-red-500 rounded-full flex items-center justify-center shadow-lg animate-pulse">
+                    <MapPin className="w-4 h-4 text-white" />
+                  </div>
+                  <div className="absolute -bottom-8 left-1/2 transform -translate-x-1/2 bg-white px-2 py-1 rounded shadow text-xs whitespace-nowrap border">
+                    {location.name}
+                  </div>
+                </div>
+              </div>
+            ))}
+            
+            {/* 网格线 */}
+            <div className="absolute inset-0 opacity-10">
+              <div className="h-full w-full" style={{
+                backgroundImage: `
+                  linear-gradient(rgba(0,0,0,0.1) 1px, transparent 1px),
+                  linear-gradient(90deg, rgba(0,0,0,0.1) 1px, transparent 1px)
+                `,
+                backgroundSize: '40px 40px'
+              }}></div>
             </div>
-            <p className="text-red-600 text-sm font-medium mb-2">地图加载失败</p>
-            <p className="text-red-500 text-xs leading-relaxed">{error}</p>
-            <div className="mt-3 text-xs text-gray-500">
-              <p>请检查：</p>
-              <p>1. .env文件中的VITE_AMAP_API_KEY配置</p>
-              <p>2. 网络连接是否正常</p>
+          </div>
+          
+          {/* 错误信息底部栏 */}
+          <div className="bg-white border-t border-gray-200 p-4">
+            <div className="flex items-center gap-3">
+              <div className="w-8 h-8 bg-orange-100 rounded-full flex items-center justify-center flex-shrink-0">
+                <MapPin className="w-4 h-4 text-orange-500" />
+              </div>
+              <div className="flex-1">
+                <p className="text-gray-800 text-sm font-medium">简化地图模式</p>
+                <p className="text-gray-500 text-xs mt-1">{error}</p>
+              </div>
             </div>
           </div>
         </div>

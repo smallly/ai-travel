@@ -75,11 +75,52 @@ def setup_logging():
     app.logger.setLevel(log_level)
 
 # 数据库模型
+class User(db.Model):
+    """用户模型"""
+    __tablename__ = 'users'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    phone = db.Column(db.String(20), unique=True, nullable=False, index=True)
+    nickname = db.Column(db.String(50), nullable=False)
+    avatar = db.Column(db.String(500), nullable=True)
+    # wechat_openid = db.Column(db.String(100), nullable=True, unique=True, index=True)  # 已注释，后续启用时解除注释
+    # wechat_unionid = db.Column(db.String(100), nullable=True, unique=True, index=True)  # 已注释，后续启用时解除注释
+    password_hash = db.Column(db.String(255), nullable=False)  # 新增密码字段
+    is_active = db.Column(db.Boolean, default=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    last_login_at = db.Column(db.DateTime, nullable=True)
+    
+    # 关联关系
+    conversations = db.relationship('Conversation', backref='user', lazy=True, cascade='all, delete-orphan')
+    
+    def set_password(self, password):
+        """设置密码"""
+        self.password_hash = generate_password_hash(password)
+    
+    def check_password(self, password):
+        """验证密码"""
+        return check_password_hash(self.password_hash, password)
+    
+    def to_dict(self):
+        beijing_tz = pytz.timezone(os.getenv('TIMEZONE', 'Asia/Shanghai'))
+        created_beijing = self.created_at.replace(tzinfo=pytz.UTC).astimezone(beijing_tz)
+        
+        return {
+            'user_id': str(self.id),
+            'phone': self.phone,
+            'nickname': self.nickname,
+            'avatar': self.avatar,
+            'created_at': created_beijing.strftime('%Y-%m-%d %H:%M:%S'),
+            'is_active': self.is_active
+        }
+
 class Conversation(db.Model):
     """对话会话模型"""
     __tablename__ = 'conversations'
     
     id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False, index=True)
     title = db.Column(db.String(255), nullable=False)
     dify_conversation_id = db.Column(db.String(255), nullable=True)  # 存储Dify的对话ID
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
@@ -93,6 +134,7 @@ class Conversation(db.Model):
         
         return {
             'id': self.id,
+            'user_id': self.user_id,
             'title': self.title,
             'dify_conversation_id': self.dify_conversation_id,
             'created_at': created_beijing.strftime('%Y-%m-%d %H:%M:%S'),
@@ -493,6 +535,62 @@ class DifyService:
 # 初始化Dify服务
 dify_service = DifyService()
 
+# 用户认证相关函数
+import jwt
+import hashlib
+import time
+from functools import wraps
+from werkzeug.security import generate_password_hash, check_password_hash
+import re
+
+def generate_token(user_id):
+    """生成JWT token"""
+    payload = {
+        'user_id': user_id,
+        'iat': time.time(),
+        'exp': time.time() + 30 * 24 * 60 * 60  # 30天过期
+    }
+    return jwt.encode(payload, app.config['SECRET_KEY'], algorithm='HS256')
+
+def verify_token(token):
+    """验证JWT token"""
+    try:
+        payload = jwt.decode(token, app.config['SECRET_KEY'], algorithms=['HS256'])
+        return payload.get('user_id')
+    except jwt.ExpiredSignatureError:
+        return None
+    except jwt.InvalidTokenError:
+        return None
+
+def require_auth(f):
+    """认证装饰器"""
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        token = None
+        auth_header = request.headers.get('Authorization')
+        
+        if auth_header:
+            try:
+                token = auth_header.split(' ')[1]  # Bearer <token>
+            except IndexError:
+                pass
+        
+        if not token:
+            return jsonify({'success': False, 'error': '未提供认证令牌'}), 401
+        
+        user_id = verify_token(token)
+        if not user_id:
+            return jsonify({'success': False, 'error': '认证令牌无效或已过期'}), 401
+        
+        # 验证用户是否存在且激活
+        user = User.query.filter_by(id=user_id, is_active=True).first()
+        if not user:
+            return jsonify({'success': False, 'error': '用户不存在或已禁用'}), 401
+        
+        request.current_user = user
+        return f(*args, **kwargs)
+    return decorated
+
 # API路由
 @app.route('/api/health', methods=['GET'])
 def health_check():
@@ -505,10 +603,12 @@ def health_check():
     })
 
 @app.route('/api/conversations', methods=['GET'])
+@require_auth
 def get_conversations():
-    """获取所有对话"""
+    """获取用户的对话列表"""
     try:
-        conversations = Conversation.query.order_by(Conversation.updated_at.desc()).all()
+        user = request.current_user
+        conversations = Conversation.query.filter_by(user_id=user.id).order_by(Conversation.updated_at.desc()).all()
         return jsonify({
             'success': True,
             'data': [conv.to_dict() for conv in conversations]
@@ -521,17 +621,19 @@ def get_conversations():
         }), 500
 
 @app.route('/api/conversations', methods=['POST'])
+@require_auth
 def create_conversation():
     """创建新对话"""
     try:
+        user = request.current_user
         data = request.get_json() or {}
         title = data.get('title', f'对话 {datetime.now().strftime("%m-%d %H:%M")}')
         
-        conversation = Conversation(title=title)
+        conversation = Conversation(title=title, user_id=user.id)
         db.session.add(conversation)
         db.session.commit()
         
-        app.logger.info(f'📝 创建新对话: {title}')
+        app.logger.info(f'📝 用户 {user.phone} 创建新对话: {title}')
         
         return jsonify({
             'success': True,
@@ -546,16 +648,21 @@ def create_conversation():
         }), 500
 
 @app.route('/api/conversations/<int:conversation_id>', methods=['DELETE'])
+@require_auth
 def delete_conversation(conversation_id):
-    """删除对话"""
+    """删除对话（仅限用户自己的对话）"""
     try:
-        conversation = Conversation.query.get_or_404(conversation_id)
+        user = request.current_user
+        conversation = Conversation.query.filter_by(
+            id=conversation_id, 
+            user_id=user.id
+        ).first_or_404()
         title = conversation.title
         
         db.session.delete(conversation)
         db.session.commit()
         
-        app.logger.info(f'🗑️ 删除对话: {title}')
+        app.logger.info(f'🗑️ 用户 {user.phone} 删除对话: {title}')
         
         return jsonify({
             'success': True,
@@ -570,10 +677,16 @@ def delete_conversation(conversation_id):
         }), 500
 
 @app.route('/api/conversations/<int:conversation_id>/messages', methods=['GET'])
+@require_auth
 def get_messages(conversation_id):
-    """获取对话消息"""
+    """获取对话消息（仅限用户自己的对话）"""
     try:
-        conversation = Conversation.query.get_or_404(conversation_id)
+        user = request.current_user
+        conversation = Conversation.query.filter_by(
+            id=conversation_id, 
+            user_id=user.id
+        ).first_or_404()
+        
         messages = Message.query.filter_by(conversation_id=conversation_id).order_by(Message.created_at).all()
         
         return jsonify({
@@ -592,13 +705,14 @@ def get_messages(conversation_id):
         }), 500
 
 @app.route('/api/chat/send', methods=['POST'])
+@require_auth
 def send_message():
     """发送消息并获取AI回复"""
     try:
+        user = request.current_user
         data = request.get_json()
         message_content = data.get('message', '').strip()
         conversation_id = data.get('conversation_id')
-        user_id = data.get('user_id', 'user')
         
         if not message_content:
             return jsonify({
@@ -610,9 +724,12 @@ def send_message():
         db_conversation = None
         dify_conversation_id = None
         
-        # 如果提供了conversation_id，尝试获取现有对话
+        # 如果提供了conversation_id，尝试获取现有对话（必须属于当前用户）
         if conversation_id:
-            db_conversation = Conversation.query.get(conversation_id)
+            db_conversation = Conversation.query.filter_by(
+                id=conversation_id, 
+                user_id=user.id
+            ).first()
             if db_conversation:
                 # 从数据库对话记录中获取Dify的conversation_id
                 dify_conversation_id = db_conversation.dify_conversation_id
@@ -620,7 +737,10 @@ def send_message():
         # 如果没有找到现有对话，创建新对话
         if not db_conversation:
             title = message_content[:30] + ('...' if len(message_content) > 30 else '')
-            db_conversation = Conversation(title=title)
+            db_conversation = Conversation(
+                title=title,
+                user_id=user.id
+            )
             db.session.add(db_conversation)
             db.session.flush()  # 获取ID但不提交
         
@@ -633,13 +753,13 @@ def send_message():
         db.session.add(user_message)
         
         # 调用Dify API（传入Dify的conversation_id，不是数据库的ID）
-        app.logger.info(f'📤 调用Dify API - 消息: {message_content[:50]}...')
+        app.logger.info(f'📤 用户 {user.phone} 发送消息: {message_content[:50]}...')
         app.logger.info(f'📤 使用Dify对话ID: {dify_conversation_id}')
         
         result = dify_service.send_message(
             message_content, 
             conversation_id=dify_conversation_id,
-            user_id=user_id
+            user_id=f"user_{user.id}"
         )
         
         if result['success']:
@@ -675,7 +795,7 @@ def send_message():
         # 提取景点信息
         attractions = dify_service.extract_attractions(ai_content)
         
-        app.logger.info(f'💬 对话完成: 数据库ID={db_conversation.id}, 景点数={len(attractions)}')
+        app.logger.info(f'💬 对话完成: 用户={user.phone}, 数据库ID={db_conversation.id}, 景点数={len(attractions)}')
         
         return jsonify({
             'success': True,
@@ -694,6 +814,291 @@ def send_message():
             'success': False,
             'error': str(e)
         }), 500
+
+# 用户认证路由
+# 微信网页授权手机号 - 已注释，后续启用时解除注释
+# @app.route('/api/auth/wechat/phone', methods=['POST'])
+# def wechat_phone_auth():
+#     """微信网页授权手机号"""
+#     try:
+#         data = request.get_json()
+#         auth_code = data.get('auth_code')
+        
+#         if not auth_code:
+#             return jsonify({'success': False, 'error': '授权码不能为空'}), 400
+        
+#         # 这里应该调用微信API验证授权码并获取手机号
+#         # 目前使用模拟数据
+#         app.logger.info(f'📱 微信网页授权: {auth_code}')
+        
+#         # 模拟从微信获取的用户信息
+#         phone = f"1{hash(auth_code) % 10000000000:010d}"  # 模拟手机号
+#         openid = f"wx_openid_{hash(auth_code) % 100000}"
+        
+#         # 查找或创建用户
+#         user = User.query.filter_by(phone=phone).first()
+#         if not user:
+#             user = User(
+#                 phone=phone,
+#                 nickname=f"用户{phone[-4:]}",
+#                 wechat_openid=openid
+#             )
+#             db.session.add(user)
+#             db.session.flush()
+        
+#         # 更新最后登录时间
+#         user.last_login_at = datetime.utcnow()
+#         db.session.commit()
+        
+#         # 生成token
+#         token = generate_token(user.id)
+        
+#         app.logger.info(f'✅ 用户登录成功: {user.phone}')
+        
+#         return jsonify({
+#             'success': True,
+#             'data': {
+#                 'token': token,
+#                 **user.to_dict()
+#             }
+#         })
+        
+#     except Exception as e:
+#         db.session.rollback()
+#         app.logger.error(f'微信授权失败: {str(e)}')
+#         return jsonify({'success': False, 'error': str(e)}), 500
+
+# 微信小程序手机号授权 - 已注释，后续启用时解除注释
+# @app.route('/api/auth/miniprogram/phone', methods=['POST'])
+# def miniprogram_phone_auth():
+#     """微信小程序手机号授权"""
+#     try:
+#         data = request.get_json()
+#         encrypted_data = data.get('encryptedData')
+#         iv = data.get('iv')
+#         session_key = data.get('sessionKey')
+        
+#         if not all([encrypted_data, iv, session_key]):
+#             return jsonify({'success': False, 'error': '授权数据不完整'}), 400
+        
+#         # 这里应该解密微信小程序的加密数据
+#         # 目前使用模拟数据
+#         app.logger.info('📱 微信小程序授权')
+        
+#         # 模拟从微信获取的用户信息
+#         phone = f"1{hash(encrypted_data) % 10000000000:010d}"  # 模拟手机号
+#         openid = f"mp_openid_{hash(encrypted_data) % 100000}"
+        
+#         # 查找或创建用户
+#         user = User.query.filter_by(phone=phone).first()
+#         if not user:
+#             user = User(
+#                 phone=phone,
+#                 nickname=f"用户{phone[-4:]}",
+#                 wechat_openid=openid
+#             )
+#             db.session.add(user)
+#             db.session.flush()
+        
+#         # 更新最后登录时间
+#         user.last_login_at = datetime.utcnow()
+#         db.session.commit()
+        
+#         # 生成token
+#         token = generate_token(user.id)
+        
+#         app.logger.info(f'✅ 用户登录成功: {user.phone}')
+        
+#         return jsonify({
+#             'success': True,
+#             'data': {
+#                 'token': token,
+#                 **user.to_dict()
+#             }
+#         })
+        
+#     except Exception as e:
+#         db.session.rollback()
+#         app.logger.error(f'小程序授权失败: {str(e)}')
+#         return jsonify({'success': False, 'error': str(e)}), 500
+
+# 手机号密码注册
+@app.route('/api/auth/register', methods=['POST'])
+def register_with_phone():
+    """手机号密码注册"""
+    try:
+        data = request.get_json()
+        phone = data.get('phone', '').strip()
+        password = data.get('password', '').strip()
+        nickname = data.get('nickname', '').strip()
+        
+        # 验证输入数据
+        if not phone:
+            return jsonify({'success': False, 'error': '手机号不能为空'}), 400
+        
+        if not password:
+            return jsonify({'success': False, 'error': '密码不能为空'}), 400
+        
+        # 验证手机号格式
+        phone_pattern = r'^1[3-9]\d{9}$'
+        if not re.match(phone_pattern, phone):
+            return jsonify({'success': False, 'error': '请输入正确的手机号'}), 400
+        
+        # 验证密码强度
+        if len(password) < 6:
+            return jsonify({'success': False, 'error': '密码至少6位'}), 400
+        
+        # 检查手机号是否已注册
+        existing_user = User.query.filter_by(phone=phone).first()
+        if existing_user:
+            return jsonify({'success': False, 'error': '该手机号已注册'}), 400
+        
+        # 创建新用户
+        user = User(
+            phone=phone,
+            nickname=nickname or f"用户{phone[-4:]}",
+            password_hash='temp'  # 临时值，下面会设置正确的密码
+        )
+        user.set_password(password)
+        
+        db.session.add(user)
+        db.session.commit()
+        
+        # 生成token
+        token = generate_token(user.id)
+        
+        app.logger.info(f'✅ 新用户注册成功: {user.phone}')
+        
+        return jsonify({
+            'success': True,
+            'data': {
+                'token': token,
+                **user.to_dict()
+            }
+        })
+        
+    except Exception as e:
+        db.session.rollback()
+        app.logger.error(f'注册失败: {str(e)}')
+        return jsonify({'success': False, 'error': '注册失败，请稍后重试'}), 500
+
+# 手机号密码登录
+@app.route('/api/auth/login', methods=['POST'])
+def login_with_phone():
+    """手机号密码登录"""
+    try:
+        data = request.get_json()
+        phone = data.get('phone', '').strip()
+        password = data.get('password', '').strip()
+        
+        # 验证输入数据
+        if not phone:
+            return jsonify({'success': False, 'error': '手机号不能为空'}), 400
+        
+        if not password:
+            return jsonify({'success': False, 'error': '密码不能为空'}), 400
+        
+        # 查找用户
+        user = User.query.filter_by(phone=phone, is_active=True).first()
+        if not user:
+            return jsonify({'success': False, 'error': '用户不存在或已禁用'}), 400
+        
+        # 验证密码
+        if not user.check_password(password):
+            return jsonify({'success': False, 'error': '密码错误'}), 400
+        
+        # 更新最后登录时间
+        user.last_login_at = datetime.utcnow()
+        db.session.commit()
+        
+        # 生成token
+        token = generate_token(user.id)
+        
+        app.logger.info(f'✅ 用户登录成功: {user.phone}')
+        
+        return jsonify({
+            'success': True,
+            'data': {
+                'token': token,
+                **user.to_dict()
+            }
+        })
+        
+    except Exception as e:
+        app.logger.error(f'登录失败: {str(e)}')
+        return jsonify({'success': False, 'error': '登录失败，请稍后重试'}), 500
+
+@app.route('/api/auth/verify', methods=['GET'])
+@require_auth
+def verify_auth():
+    """验证用户认证状态"""
+    try:
+        user = request.current_user
+        return jsonify({
+            'success': True,
+            'data': user.to_dict()
+        })
+    except Exception as e:
+        app.logger.error(f'验证认证状态失败: {str(e)}')
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/auth/logout', methods=['POST'])
+@require_auth
+def logout():
+    """用户登出"""
+    try:
+        user = request.current_user
+        app.logger.info(f'👋 用户登出: {user.phone}')
+        
+        return jsonify({
+            'success': True,
+            'data': {'message': '登出成功'}
+        })
+    except Exception as e:
+        app.logger.error(f'登出失败: {str(e)}')
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/user/profile', methods=['GET'])
+@require_auth
+def get_profile():
+    """获取用户信息"""
+    try:
+        user = request.current_user
+        return jsonify({
+            'success': True,
+            'data': user.to_dict()
+        })
+    except Exception as e:
+        app.logger.error(f'获取用户信息失败: {str(e)}')
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/user/profile', methods=['PUT'])
+@require_auth
+def update_profile():
+    """更新用户信息"""
+    try:
+        user = request.current_user
+        data = request.get_json()
+        
+        if 'nickname' in data:
+            user.nickname = data['nickname']
+        if 'avatar' in data:
+            user.avatar = data['avatar']
+        
+        user.updated_at = datetime.utcnow()
+        db.session.commit()
+        
+        app.logger.info(f'📝 用户信息更新: {user.phone}')
+        
+        return jsonify({
+            'success': True,
+            'data': user.to_dict()
+        })
+        
+    except Exception as e:
+        db.session.rollback()
+        app.logger.error(f'更新用户信息失败: {str(e)}')
+        return jsonify({'success': False, 'error': str(e)}), 500
 
 @app.route('/api/locations/navigation', methods=['POST'])
 def get_navigation():

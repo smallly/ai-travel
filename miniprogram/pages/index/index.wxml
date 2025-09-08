@@ -1,0 +1,172 @@
+<!--pages/index/index.wxml-->
+<view class="trip-container">
+  <!-- 页面头部 -->
+  <view class="page-header">
+    <text class="page-title">我的行程</text>
+  </view>
+
+  <!-- Tab切换 -->
+  <view class="tab-container">
+    <view class="tab-list">
+      <view 
+        class="tab-item {{currentTab === 'pending' ? 'active' : ''}}"
+        data-tab="pending"
+        bindtap="onTabChange"
+      >
+        <text class="tab-text">待出行</text>
+      </view>
+      <view 
+        class="tab-item {{currentTab === 'planning' ? 'active' : ''}}"
+        data-tab="planning" 
+        bindtap="onTabChange"
+      >
+        <text class="tab-text">规划中</text>
+      </view>
+      <view 
+        class="tab-item {{currentTab === 'completed' ? 'active' : ''}}"
+        data-tab="completed"
+        bindtap="onTabChange"
+      >
+        <text class="tab-text">已完成</text>
+      </view>
+    </view>
+  </view>
+
+  <!-- 内容区域 -->
+  <view class="content-container">
+    <!-- 待出行页面 -->
+    <view class="tab-content" wx:if="{{currentTab === 'pending'}}">
+      <!-- 地图区域 -->
+      <view class="map-section {{isMapFullscreen ? 'fullscreen' : ''}}">
+        <map
+          id="tripMap"
+          class="trip-map"
+          latitude="{{mapCenter.latitude}}"
+          longitude="{{mapCenter.longitude}}"
+          scale="{{12}}"
+          markers="{{mapMarkers}}"
+          show-location="{{true}}"
+          enable-3D="{{true}}"
+          bindmarkertap="onMarkerTap"
+          bindready="onMapReady"
+        />
+        
+        <!-- 地图控制按钮 -->
+        <view class="map-controls">
+          <button class="control-btn" bindtap="onToggleMapFullscreen">
+            <text class="btn-icon">{{isMapFullscreen ? '📱' : '🔍'}}</text>
+          </button>
+          <button class="control-btn" bindtap="onMoveToUserLocation">
+            <text class="btn-icon">📍</text>
+          </button>
+          <button class="control-btn" wx:if="{{mapMarkers.length > 0}}" bindtap="onIncludeAllPoints">
+            <text class="btn-icon">🗺️</text>
+          </button>
+        </view>
+
+        <!-- 全屏时的返回按钮 -->
+        <view class="back-btn" wx:if="{{isMapFullscreen}}" bindtap="onToggleMapFullscreen">
+          <text class="back-icon">←</text>
+        </view>
+      </view>
+
+      <!-- 我的地点列表 -->
+      <view class="locations-section" wx:if="{{!isMapFullscreen}}">
+        <view class="section-header">
+          <text class="section-title">我的旅行地点</text>
+          <text class="location-count">{{myLocations.length}}个地点</text>
+        </view>
+
+        <view class="locations-list" wx:if="{{myLocations.length > 0}}">
+          <block wx:for="{{myLocations}}" wx:key="id">
+            <view class="location-card" bindtap="showLocationActions" data-location="{{item}}">
+              <image class="location-image" src="/images/default-location.jpg" mode="aspectFill" />
+              <view class="location-info">
+                <text class="location-name">{{item.name}}</text>
+                <text class="location-address">{{item.address}}</text>
+                <text class="location-time">保存于 {{item.savedDate}}</text>
+              </view>
+              <view class="location-actions">
+                <button class="action-btn navigate-btn" data-location="{{item}}" bindtap="navigateToLocation">
+                  <text class="action-icon">🧭</text>
+                </button>
+              </view>
+            </view>
+          </block>
+        </view>
+
+        <!-- 空状态 -->
+        <view class="empty-state" wx:if="{{myLocations.length === 0}}">
+          <text class="empty-icon">📍</text>
+          <text class="empty-title">暂无旅行地点</text>
+          <text class="empty-desc">去对话页面添加一些地点吧</text>
+          <button class="empty-btn" bindtap="onCreateTrip">
+            开始规划旅行
+          </button>
+        </view>
+      </view>
+    </view>
+
+    <!-- 规划中页面 -->
+    <view class="tab-content" wx:if="{{currentTab === 'planning'}}">
+      <view class="trip-list" wx:if="{{tripPlans.planning.length > 0}}">
+        <block wx:for="{{tripPlans.planning}}" wx:key="id">
+          <view class="trip-card" data-trip="{{item}}" bindtap="onViewTripDetail">
+            <image class="trip-image" src="{{item.image || '/images/default-trip.jpg'}}" mode="aspectFill" />
+            <view class="trip-info">
+              <text class="trip-title">{{item.title}}</text>
+              <text class="trip-meta">{{item.duration}} · {{item.locations}}个地点</text>
+              <text class="trip-date">创建于 {{item.created_at}}</text>
+            </view>
+            <view class="trip-status planning">
+              <text class="status-icon">🕐</text>
+            </view>
+          </view>
+        </block>
+      </view>
+
+      <!-- 空状态 -->
+      <view class="empty-state" wx:if="{{tripPlans.planning.length === 0}}">
+        <text class="empty-icon">🗓️</text>
+        <text class="empty-title">暂无规划中的行程</text>
+        <text class="empty-desc">开始创建你的第一个旅行计划</text>
+        <button class="empty-btn" bindtap="onCreateTrip">
+          创建行程
+        </button>
+      </view>
+    </view>
+
+    <!-- 已完成页面 -->
+    <view class="tab-content" wx:if="{{currentTab === 'completed'}}">
+      <view class="trip-list" wx:if="{{tripPlans.completed.length > 0}}">
+        <block wx:for="{{tripPlans.completed}}" wx:key="id">
+          <view class="trip-card" data-trip="{{item}}" bindtap="onViewTripDetail">
+            <image class="trip-image" src="{{item.image || '/images/default-trip.jpg'}}" mode="aspectFill" />
+            <view class="trip-info">
+              <text class="trip-title">{{item.title}}</text>
+              <text class="trip-meta">{{item.duration}} · {{item.locations}}个地点</text>
+              <text class="trip-date">{{item.start_date}} - {{item.end_date}}</text>
+            </view>
+            <view class="trip-status completed">
+              <text class="status-icon">✅</text>
+            </view>
+          </view>
+        </block>
+      </view>
+
+      <!-- 空状态 -->
+      <view class="empty-state" wx:if="{{tripPlans.completed.length === 0}}">
+        <text class="empty-icon">📷</text>
+        <text class="empty-title">暂无已完成的行程</text>
+        <text class="empty-desc">完成的旅行会出现在这里</text>
+      </view>
+    </view>
+  </view>
+
+  <!-- 加载状态 -->
+  <view class="loading-overlay" wx:if="{{loading}}">
+    <view class="loading-content">
+      <text class="loading-text">加载中...</text>
+    </view>
+  </view>
+</view>

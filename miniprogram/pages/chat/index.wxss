@@ -1,0 +1,360 @@
+/* pages/chat/index.wxss */
+.chat-container {
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background-color: #f8f9fa;
+}
+
+.messages-container {
+  flex: 1;
+  padding: 32rpx 32rpx 0;
+}
+
+.messages-list {
+  padding-bottom: 32rpx;
+}
+
+.message-item {
+  margin-bottom: 32rpx;
+}
+
+.message-time {
+  text-align: center;
+  font-size: 20rpx;
+  color: #999;
+  margin-bottom: 16rpx;
+}
+
+/* 消息气泡样式 */
+.user-message {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+}
+
+.ai-message {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+}
+
+.message-bubble {
+  max-width: 80%;
+  padding: 24rpx 32rpx;
+  border-radius: 32rpx;
+  word-wrap: break-word;
+  word-break: break-all;
+}
+
+.user-bubble {
+  background: linear-gradient(135deg, #6366F1 0%, #3B82F6 100%);
+  color: white;
+  border-bottom-right-radius: 12rpx;
+}
+
+.ai-bubble {
+  background-color: white;
+  color: #333;
+  border: 2rpx solid #e5e7eb;
+  border-bottom-left-radius: 12rpx;
+  box-shadow: 0 4rpx 12rpx rgba(0, 0, 0, 0.05);
+}
+
+.message-text {
+  font-size: 28rpx;
+  line-height: 1.6;
+  white-space: pre-wrap;
+}
+
+/* AI输入中动画 */
+.typing-bubble {
+  padding: 32rpx;
+}
+
+.typing-dots {
+  display: flex;
+  align-items: center;
+  gap: 8rpx;
+}
+
+.dot {
+  width: 16rpx;
+  height: 16rpx;
+  background-color: #6b7280;
+  border-radius: 50%;
+  animation: typing 1.4s infinite;
+}
+
+.dot:nth-child(2) {
+  animation-delay: 0.2s;
+}
+
+.dot:nth-child(3) {
+  animation-delay: 0.4s;
+}
+
+@keyframes typing {
+  0%, 60%, 100% {
+    transform: scale(1);
+    opacity: 0.5;
+  }
+  30% {
+    transform: scale(1.2);
+    opacity: 1;
+  }
+}
+
+/* 景点列表样式 */
+.attractions-container {
+  margin-top: 24rpx;
+  margin-left: 0;
+  width: 100%;
+}
+
+.attractions-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16rpx;
+}
+
+.attractions-title {
+  font-size: 24rpx;
+  color: #666;
+  font-weight: 500;
+}
+
+.add-all-btn {
+  background: linear-gradient(135deg, #6366F1 0%, #3B82F6 100%);
+  color: white;
+  border-radius: 24rpx;
+  border: none;
+  font-size: 20rpx;
+  padding: 8rpx 16rpx;
+}
+
+.attractions-list {
+  display: flex;
+  flex-direction: column;
+  gap: 16rpx;
+}
+
+.attraction-card {
+  display: flex;
+  background-color: #f8f9fa;
+  border-radius: 24rpx;
+  padding: 24rpx;
+  border: 2rpx solid #e5e7eb;
+}
+
+.attraction-image {
+  width: 120rpx;
+  height: 120rpx;
+  border-radius: 16rpx;
+  margin-right: 24rpx;
+  flex-shrink: 0;
+}
+
+.attraction-info {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+
+.attraction-name {
+  font-size: 28rpx;
+  font-weight: 600;
+  color: #333;
+  margin-bottom: 8rpx;
+  line-height: 1.4;
+}
+
+.attraction-address {
+  font-size: 22rpx;
+  color: #666;
+  margin-bottom: 16rpx;
+  line-height: 1.4;
+}
+
+.attraction-actions {
+  display: flex;
+  gap: 16rpx;
+}
+
+.action-btn {
+  font-size: 20rpx;
+  border-radius: 20rpx;
+  border: none;
+  padding: 8rpx 16rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.navigate-btn {
+  background-color: #10b981;
+  color: white;
+}
+
+.add-btn {
+  background-color: #6366f1;
+  color: white;
+}
+
+/* 滚动到底部按钮 */
+.scroll-to-bottom {
+  position: fixed;
+  right: 32rpx;
+  bottom: 200rpx;
+  width: 80rpx;
+  height: 80rpx;
+  background-color: rgba(255, 255, 255, 0.9);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4rpx 16rpx rgba(0, 0, 0, 0.1);
+  opacity: 0;
+  transform: translateY(20rpx);
+  transition: all 0.3s ease;
+  z-index: 999;
+}
+
+.scroll-to-bottom.show {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.scroll-icon {
+  font-size: 32rpx;
+  color: #6366f1;
+}
+
+/* 输入区域样式 */
+.input-container {
+  background-color: white;
+  border-top: 2rpx solid #e5e7eb;
+  padding: 32rpx;
+  padding-bottom: calc(32rpx + constant(safe-area-inset-bottom));
+  padding-bottom: calc(32rpx + env(safe-area-inset-bottom));
+}
+
+.input-wrapper {
+  display: flex;
+  align-items: flex-end;
+  gap: 16rpx;
+  margin-bottom: 16rpx;
+}
+
+.message-input {
+  flex: 1;
+  min-height: 80rpx;
+  max-height: 200rpx;
+  padding: 20rpx 24rpx;
+  background-color: #f8f9fa;
+  border-radius: 32rpx;
+  border: 2rpx solid #e5e7eb;
+  font-size: 28rpx;
+  line-height: 1.4;
+}
+
+.send-btn {
+  width: 80rpx;
+  height: 80rpx;
+  background-color: #e5e7eb;
+  border-radius: 50%;
+  border: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.3s ease;
+  flex-shrink: 0;
+}
+
+.send-btn.active {
+  background: linear-gradient(135deg, #6366F1 0%, #3B82F6 100%);
+}
+
+.send-btn.active .send-icon {
+  filter: brightness(0) invert(1);
+}
+
+.send-icon {
+  font-size: 32rpx;
+}
+
+.function-buttons {
+  display: flex;
+  gap: 16rpx;
+  justify-content: center;
+}
+
+.function-btn {
+  background-color: #f3f4f6;
+  border: none;
+  border-radius: 24rpx;
+  padding: 16rpx 24rpx;
+  display: flex;
+  align-items: center;
+  gap: 8rpx;
+  font-size: 24rpx;
+  color: #6b7280;
+}
+
+.btn-icon {
+  font-size: 20rpx;
+}
+
+.btn-text {
+  font-size: 20rpx;
+}
+
+/* 响应式适配 */
+@media screen and (max-width: 375px) {
+  .message-bubble {
+    max-width: 85%;
+  }
+  
+  .attraction-card {
+    padding: 16rpx;
+  }
+  
+  .attraction-image {
+    width: 100rpx;
+    height: 100rpx;
+    margin-right: 16rpx;
+  }
+}
+
+/* 动画效果 */
+.message-item {
+  animation: messageSlideIn 0.3s ease-out;
+}
+
+@keyframes messageSlideIn {
+  from {
+    opacity: 0;
+    transform: translateY(20rpx);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.attraction-card {
+  transition: all 0.2s ease;
+}
+
+.attraction-card:hover {
+  transform: translateY(-4rpx);
+  box-shadow: 0 8rpx 20rpx rgba(0, 0, 0, 0.08);
+}
+
+/* 安全区域适配 */
+.input-container {
+  padding-bottom: calc(32rpx + constant(safe-area-inset-bottom));
+  padding-bottom: calc(32rpx + env(safe-area-inset-bottom));
+}

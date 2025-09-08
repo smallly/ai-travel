@@ -73,9 +73,10 @@ class MapConfig {
       
       script.onerror = (error) => {
         console.error('❌ 高德地图API加载失败:', error);
-        const errorMsg = '高德地图API加载失败，可能的原因：\n1. API Key无效\n2. 网络连接问题\n3. 域名未在高德控制台配置';
-        console.error(errorMsg);
-        reject(new Error(errorMsg));
+        console.log('🔄 网络连接可能存在问题，将显示简化地图');
+        // 不抛出错误，而是设置为加载失败状态，让组件显示fallback UI
+        this.isMapLoaded = false;
+        reject(new Error('网络连接问题，无法加载地图API'));
       };
 
       // 添加到页面头部

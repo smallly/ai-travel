@@ -5,6 +5,8 @@ import RealMap from './components/RealMap';
 import TripDetailPage from './components/TripDetailPage';
 import PlanningTripDetail from './components/PlanningTripDetail';
 import CompletedTripDetail from './components/CompletedTripDetail';
+import { UserProvider, useUser } from './contexts/UserContext';
+import LoginModal from './components/LoginModal';
 import { 
   MessageCircle, 
   Map, 
@@ -25,7 +27,8 @@ import {
   Maximize,
   Minimize,
   Lock,
-  PlusCircle
+  PlusCircle,
+  Phone
 } from 'lucide-react';
 
 // 类型定义
@@ -170,7 +173,9 @@ const ChatInput = React.memo<{
   return prevProps.disabled === nextProps.disabled;
 });
 
-function App() {
+// 主应用组件（包含认证逻辑）
+function AppContent() {
+  const { user, isLoading, isAuthenticated } = useUser();
   const [currentScreen, setCurrentScreen] = useState<Screen>('login');
   const [currentTab, setCurrentTab] = useState<Tab>('chat');
   const [currentItineraryTab, setCurrentItineraryTab] = useState<'pending' | 'planning' | 'completed'>('pending');
@@ -199,6 +204,8 @@ function App() {
     message: '', 
     visible: false 
   });
+  // 登录弹窗状态
+  const [showLogin, setShowLogin] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState<{
     visible: boolean;
     locationId: string;
@@ -209,7 +216,7 @@ function App() {
   const [messages, setMessages] = useState<Message[]>([
     {
       id: '1',
-      text: '你好！我是你的AI旅行助手 🤖✨\n\n🎯 我能为你做什么：\n• 🔗 解析小红书、大众点评等旅行链接\n• 📍 提取并保存地点信息\n• 🗺️ 制定个性化旅行计划\n• 💡 推荐当地特色和隐藏美食\n• 🚗 提供交通和住宿建议\n\n快发送一个旅行链接或告诉我你想去哪里吧！',
+      text: '👋 你好！我是你的AI旅行助手\n\n✨ 我能帮你：\n🔗 解析旅行链接，提取地点信息\n📍 制定个性化旅行计划\n🗺️ 推荐当地特色和美食\n🚗 提供交通住宿建议\n\n发送旅行链接或告诉我你想去哪里吧！',
       isAI: true,
       timestamp: new Date(),
       isWelcome: true
@@ -712,6 +719,12 @@ function App() {
 
   // 发送消息 - 使用 useRef 来避免闭包问题
   const handleSendMessage = useCallback(async (messageText: string) => {
+    // 检查用户是否已登录
+    if (!isAuthenticated) {
+      setShowLogin(true);
+      return;
+    }
+
     const userMessage: Message = {
       id: Date.now().toString(),
       text: messageText,
@@ -723,7 +736,7 @@ function App() {
     setIsTyping(true);
 
     try {
-      // 发送消息到后端
+      // 发送消息到后端，包含用户ID
       const response = await chatApi.sendMessage(messageText, conversationIdRef.current || undefined);
       
       if (response.success && response.data) {
@@ -764,7 +777,20 @@ function App() {
     } finally {
       setIsTyping(false);
     }
-  }, []);
+  }, [isAuthenticated, cleanAIText]);
+
+  // 初始化用户认证状态
+  useEffect(() => {
+    if (!isLoading) {
+      if (isAuthenticated) {
+        setCurrentScreen('main');
+        setCurrentTab('chat');
+      } else {
+        setCurrentScreen('main'); // 直接进入主界面，但需要在发送消息时检查登录状态
+        setCurrentTab('chat');
+      }
+    }
+  }, [isLoading, isAuthenticated]);
 
   // 使用 useRef 来保持最新的状态引用
   const conversationIdRef = useRef(currentConversationId);
@@ -806,9 +832,35 @@ function App() {
     setShowLogoutConfirm(true);
   };
 
-  const confirmLogout = () => {
+  const confirmLogout = async () => {
+    try {
+      // 调用后端登出接口
+      const token = localStorage.getItem('auth_token');
+      if (token) {
+        await fetch('http://127.0.0.1:5000/api/auth/logout', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          }
+        });
+      }
+    } catch (error) {
+      console.error('登出请求失败:', error);
+    }
+    
+    // 清理本地存储
+    localStorage.removeItem('auth_token');
+    localStorage.removeItem('user_data');
+    
+    // 重置用户状态
+    if (user?.logout) {
+      user.logout();
+    }
+    
     setShowLogoutConfirm(false);
-    setCurrentScreen('login');
+    setCurrentScreen('main'); // 返回主界面，但用户将处于未登录状态
+    showToast('已退出登录');
   };
 
   const cancelLogout = () => {
@@ -833,10 +885,10 @@ function App() {
 
         <form onSubmit={handleLogin} className="space-y-6">
           <div className="relative">
-            <Mail className="absolute left-4 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
+            <Phone className="absolute left-4 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
             <FormInput
-              type="text"
-              placeholder="请输入邮箱"
+              type="tel"
+              placeholder="请输入手机号"
               className="w-full pl-12 pr-4 py-3 bg-white rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-purple-500 text-gray-800 placeholder-gray-400"
             />
           </div>
@@ -900,17 +952,23 @@ function App() {
       <div className="flex-1 px-8 py-4 relative z-10">
         <form onSubmit={handleRegister} className="space-y-5">
           <div className="relative">
-            <Mail className="absolute left-4 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
+            <Phone className="absolute left-4 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
             <FormInput
-              type="text"
-              placeholder="请输入邮箱"
+              type="tel"
+              placeholder="请输入手机号"
               className="w-full pl-12 pr-4 py-3 bg-white rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-purple-500 text-gray-800 placeholder-gray-400"
             />
           </div>
 
           <div className="flex gap-3">
             <div className="flex-1 relative">
-              <Mail className="absolute left-4 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
+              <div className="w-5 h-5 text-gray-400 absolute left-4 top-1/2 transform -translate-y-1/2">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M9 12l2 2 4-4"/>
+                  <path d="M21 12c-1 0-3-1-3-3s2-3 3-3 3 1 3 3-2 3-3 3"/>
+                  <path d="M3 12c1 0 3-1 3-3s-2-3-3-3-3 1-3 3 2 3 3 3"/>
+                </svg>
+              </div>
               <FormInput
                 type="text"
                 placeholder="验证码"
@@ -1009,14 +1067,14 @@ function App() {
           </div>
 
           <div>
-            <label className="block text-gray-700 font-medium mb-2">邮箱</label>
+            <label className="block text-gray-700 font-medium mb-2">手机号</label>
             <input
-              type="email"
-              value={userProfile.email}
+              type="tel"
+              value={user?.phone || '未设置'}
               disabled
               className="w-full px-4 py-4 bg-gray-100 border border-gray-200 rounded-2xl text-gray-500 text-lg"
             />
-            <p className="text-gray-400 text-sm mt-1">邮箱不可修改</p>
+            <p className="text-gray-400 text-sm mt-1">手机号不可修改</p>
           </div>
         </div>
       </div>
@@ -1131,9 +1189,9 @@ function App() {
 
   // 聊天页面
   const ChatScreen = () => (
-    <div className="flex flex-col h-full bg-white max-w-md mx-auto">
+    <div className="flex flex-col h-full bg-gradient-to-b from-gray-50 to-white max-w-md mx-auto">
       {/* 头部 */}
-      <div className="bg-white border-b border-gray-100 px-4 py-4 flex items-center justify-center relative">
+      <div className="bg-white/80 backdrop-blur-sm border-b border-gray-100 px-4 py-4 flex items-center justify-center relative">
         <h2 className="font-semibold text-gray-800 text-lg">对话</h2>
       </div>
 
@@ -1154,11 +1212,17 @@ function App() {
             <div className={`flex ${message.isAI ? 'justify-start' : 'justify-end'}`}>
               <div className={`max-w-[80%] min-w-0 ${
                 message.isAI 
-                  ? 'bg-white border border-gray-200 shadow-sm' 
-                  : 'bg-gradient-to-r from-purple-500 to-blue-500 text-white'
-              } rounded-2xl px-4 py-2`}>
+                  ? message.isWelcome
+                    ? 'bg-white border border-gray-200 shadow-sm'
+                    : 'bg-white/90 backdrop-blur-sm border border-gray-200/50 shadow-md'
+                  : 'bg-gradient-to-r from-purple-500 to-blue-500 text-white shadow-lg'
+              } rounded-2xl px-4 py-3`}>
                 <p className={`text-sm whitespace-pre-line leading-relaxed break-words overflow-wrap-anywhere ${
-                  message.isAI ? 'text-gray-700' : 'text-left'
+                  message.isAI 
+                    ? message.isWelcome 
+                      ? 'text-gray-700' 
+                      : 'text-gray-700' 
+                    : 'text-left'
                 }`}>{message.text}</p>
               </div>
             </div>
@@ -1168,7 +1232,7 @@ function App() {
                   <span className="text-sm text-gray-600">发现 {message.attractions.length} 个景点</span>
                   <button 
                     onClick={() => addAllToItinerary(message.attractions!)}
-                    className="text-purple-500 text-sm font-medium px-3 py-1 bg-purple-50 rounded-lg hover:bg-purple-100 transition-colors flex items-center gap-1"
+                    className="text-purple-500 text-sm font-medium px-3 py-1 bg-white/80 backdrop-blur-sm rounded-lg hover:bg-purple-50 transition-colors flex items-center gap-1 shadow-sm border border-purple-100"
                   >
                     <Plus className="w-3 h-3" />
                     批量添加
@@ -1191,11 +1255,11 @@ function App() {
 
         {isTyping && (
           <div className="flex justify-start">
-            <div className="bg-white rounded-2xl px-4 py-3 shadow-sm border border-gray-100">
+            <div className="bg-white/90 backdrop-blur-sm rounded-2xl px-4 py-3 shadow-md border border-gray-200/50">
               <div className="flex gap-1">
-                <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"></div>
-                <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
-                <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
+                <div className="w-2 h-2 bg-purple-400 rounded-full animate-bounce"></div>
+                <div className="w-2 h-2 bg-purple-400 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
+                <div className="w-2 h-2 bg-purple-400 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
               </div>
             </div>
           </div>
@@ -1203,7 +1267,7 @@ function App() {
       </div>
 
       {/* 输入区域 */}
-      <div className="bg-white border-t border-gray-100 p-4 safe-area-bottom">
+      <div className="bg-white/90 backdrop-blur-sm border-t border-gray-200/50 p-4 safe-area-bottom">
         <ChatInput onSendMessage={handleSendMessage} disabled={isTyping} />
       </div>
     </div>
@@ -1372,7 +1436,7 @@ function App() {
                   className="bg-gray-50 rounded-2xl p-4 shadow-sm cursor-pointer hover:bg-gray-100 transition-colors"
                   onClick={() => handleViewTripDetail(plan)}
                 >
-                  <div className="flex items-center gap-3 mb-3">
+                  <div className="flex items-center gap-3">
                     <img
                       src={plan.image}
                       alt={plan.title}
@@ -1383,27 +1447,6 @@ function App() {
                       <p className="text-sm text-gray-500">{plan.duration} · {plan.locations}个地点</p>
                       <p className="text-xs text-gray-400 mt-1">创建于 {plan.createdAt}</p>
                     </div>
-                    <div className="w-12 h-12 bg-blue-100 rounded-xl flex items-center justify-center">
-                      <Clock className="w-6 h-6 text-blue-500" />
-                    </div>
-                  </div>
-                  
-                  {/* 查看地图按钮 */}
-                  <div className="flex justify-center mt-3">
-                    <button 
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        navigateToLocation(
-                          plan.destination || plan.title, 
-                          plan.centerCoordinates
-                        );
-                      }}
-                      className="bg-white text-purple-600 px-4 py-2 rounded-full flex items-center gap-2 text-sm font-medium shadow-md border border-purple-200 hover:bg-purple-50 transition-colors"
-                      title={`导航到${plan.destination || plan.title}`}
-                    >
-                      <Map className="w-4 h-4" />
-                      查看地图
-                    </button>
                   </div>
                 </div>
               ))}
@@ -1432,7 +1475,7 @@ function App() {
                   className="bg-gray-50 rounded-2xl p-4 shadow-sm cursor-pointer hover:bg-gray-100 transition-colors"
                   onClick={() => handleViewTripDetail(plan)}
                 >
-                  <div className="flex items-center gap-3 mb-3">
+                  <div className="flex items-center gap-3">
                     <img
                       src={plan.image}
                       alt={plan.title}
@@ -1443,27 +1486,6 @@ function App() {
                       <p className="text-sm text-gray-500">{plan.duration} · {plan.locations}个地点</p>
                       <p className="text-xs text-gray-400 mt-1">{plan.startDate} - {plan.endDate}</p>
                     </div>
-                    <div className="w-12 h-12 bg-green-100 rounded-xl flex items-center justify-center">
-                      <Check className="w-6 h-6 text-green-500" />
-                    </div>
-                  </div>
-                  
-                  {/* 查看地图按钮 */}
-                  <div className="flex justify-center mt-3">
-                    <button 
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        navigateToLocation(
-                          plan.destination || plan.title, 
-                          plan.centerCoordinates
-                        );
-                      }}
-                      className="bg-white text-purple-600 px-4 py-2 rounded-full flex items-center gap-2 text-sm font-medium shadow-md border border-purple-200 hover:bg-purple-50 transition-colors"
-                      title={`导航到${plan.destination || plan.title}`}
-                    >
-                      <Map className="w-4 h-4" />
-                      查看地图
-                    </button>
                   </div>
                 </div>
               ))}
@@ -1485,7 +1507,16 @@ function App() {
 
       <div className="flex-1 p-4 overflow-y-auto custom-scrollbar">
         {/* 用户信息 */}
-        <div className="bg-gray-50 rounded-2xl p-4 mb-6">
+        <div 
+          className={`bg-gray-50 rounded-2xl p-4 mb-6 ${
+            !isAuthenticated ? 'cursor-pointer hover:bg-gray-100 transition-colors' : ''
+          }`}
+          onClick={() => {
+            if (!isAuthenticated) {
+              setShowLogin(true);
+            }
+          }}
+        >
           <div className="flex items-center gap-4">
             <img 
               src="./默认头像-1.png" 
@@ -1493,15 +1524,28 @@ function App() {
               className="w-16 h-16 rounded-full object-cover"
             />
             <div className="flex-1">
-              <h3 className="font-semibold text-gray-800 text-lg">{userProfile.nickname}</h3>
-              <p className="text-gray-500 text-sm">{userProfile.email}</p>
+              <h3 className="font-semibold text-gray-800 text-lg">
+                {isAuthenticated ? user?.nickname : '未登录用户'}
+              </h3>
+              <p className="text-gray-500 text-sm">
+                {isAuthenticated ? user?.phone : '点击登录以享受完整服务'}
+              </p>
             </div>
-            <button 
-              onClick={handleEditProfile}
-              className="text-gray-400 p-2 hover:bg-gray-100 rounded-full transition-colors"
-            >
-              <Edit3 className="w-5 h-5" />
-            </button>
+            {isAuthenticated ? (
+              <button 
+                onClick={(e) => {
+                  e.stopPropagation(); // 防止触发父元素的点击事件
+                  handleEditProfile();
+                }}
+                className="text-gray-400 p-2 hover:bg-gray-100 rounded-full transition-colors"
+              >
+                <Edit3 className="w-5 h-5" />
+              </button>
+            ) : (
+              <div className="text-purple-500 text-sm font-medium">
+                点击登录
+              </div>
+            )}
           </div>
         </div>
 
@@ -1519,15 +1563,17 @@ function App() {
           </div>
         </div>
 
-        {/* 退出登录 */}
-        <div className="text-center mb-8">
-          <button
-            onClick={handleLogout}
-            className="text-red-500 font-medium text-lg"
-          >
-            退出登录
-          </button>
-        </div>
+        {/* 退出登录 - 仅登录状态下显示 */}
+        {isAuthenticated && (
+          <div className="text-center mb-8">
+            <button
+              onClick={handleLogout}
+              className="text-red-500 font-medium text-lg"
+            >
+              退出登录
+            </button>
+          </div>
+        )}
 
         {/* 版本号 */}
         <div className="text-center text-gray-400 text-sm">
@@ -1668,6 +1714,16 @@ function App() {
         </div>
       )}
 
+      {/* 登录弹窗 */}
+      <LoginModal
+        isOpen={showLogin}
+        onClose={() => setShowLogin(false)}
+        onAuthSuccess={() => {
+          setShowLogin(false);
+          showToast('登录成功！');
+        }}
+      />
+      
       {/* 行程详情页面 */}
       {currentScreen === 'tripDetail' && selectedTrip && (
         <TripDetailPage 
@@ -1677,6 +1733,15 @@ function App() {
         />
       )}
     </div>
+  );
+}
+
+// 包装后的主应用组件
+function App() {
+  return (
+    <UserProvider>
+      <AppContent />
+    </UserProvider>
   );
 }
 

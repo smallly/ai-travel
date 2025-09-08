@@ -1,0 +1,439 @@
+/* pages/index/index.wxss */
+.trip-container {
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background-color: #f8f9fa;
+}
+
+.page-header {
+  padding: 32rpx;
+  background-color: white;
+  border-bottom: 2rpx solid #e5e7eb;
+}
+
+.page-title {
+  font-size: 36rpx;
+  font-weight: bold;
+  color: #1f2937;
+}
+
+.tab-container {
+  background-color: white;
+  padding: 0 32rpx;
+  border-bottom: 2rpx solid #e5e7eb;
+}
+
+.tab-list {
+  display: flex;
+  align-items: center;
+}
+
+.tab-item {
+  flex: 1;
+  padding: 24rpx 0;
+  text-align: center;
+  position: relative;
+  transition: all 0.3s ease;
+}
+
+.tab-text {
+  font-size: 28rpx;
+  color: #6b7280;
+  font-weight: 500;
+}
+
+.tab-item.active .tab-text {
+  color: #6366f1;
+  font-weight: 600;
+}
+
+.tab-item.active::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 60rpx;
+  height: 6rpx;
+  background: linear-gradient(135deg, #6366F1 0%, #3B82F6 100%);
+  border-radius: 3rpx;
+}
+
+.content-container {
+  flex: 1;
+  overflow: hidden;
+}
+
+.tab-content {
+  height: 100%;
+  overflow-y: auto;
+}
+
+/* 地图区域样式 */
+.map-section {
+  height: 400rpx;
+  margin: 32rpx;
+  border-radius: 24rpx;
+  overflow: hidden;
+  position: relative;
+  transition: all 0.3s ease;
+}
+
+.map-section.fullscreen {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 100vh;
+  margin: 0;
+  border-radius: 0;
+  z-index: 999;
+}
+
+.trip-map {
+  width: 100%;
+  height: 100%;
+}
+
+.map-controls {
+  position: absolute;
+  top: 32rpx;
+  right: 32rpx;
+  display: flex;
+  flex-direction: column;
+  gap: 16rpx;
+}
+
+.control-btn {
+  width: 80rpx;
+  height: 80rpx;
+  background-color: rgba(255, 255, 255, 0.9);
+  border-radius: 50%;
+  border: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4rpx 12rpx rgba(0, 0, 0, 0.1);
+  backdrop-filter: blur(10rpx);
+}
+
+.btn-icon {
+  font-size: 32rpx;
+}
+
+.back-btn {
+  position: absolute;
+  top: 32rpx;
+  left: 32rpx;
+  width: 80rpx;
+  height: 80rpx;
+  background-color: rgba(255, 255, 255, 0.9);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4rpx 12rpx rgba(0, 0, 0, 0.1);
+  backdrop-filter: blur(10rpx);
+}
+
+.back-icon {
+  font-size: 36rpx;
+  font-weight: bold;
+  color: #333;
+}
+
+/* 地点列表样式 */
+.locations-section {
+  padding: 32rpx;
+}
+
+.section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 32rpx;
+}
+
+.section-title {
+  font-size: 32rpx;
+  font-weight: 600;
+  color: #1f2937;
+}
+
+.location-count {
+  font-size: 24rpx;
+  color: #6b7280;
+}
+
+.locations-list {
+  display: flex;
+  flex-direction: column;
+  gap: 24rpx;
+}
+
+.location-card {
+  background-color: white;
+  border-radius: 24rpx;
+  padding: 32rpx;
+  display: flex;
+  align-items: center;
+  gap: 24rpx;
+  box-shadow: 0 2rpx 8rpx rgba(0, 0, 0, 0.04);
+  transition: all 0.3s ease;
+}
+
+.location-card:active {
+  transform: scale(0.98);
+  background-color: #f8f9fa;
+}
+
+.location-image {
+  width: 120rpx;
+  height: 120rpx;
+  border-radius: 16rpx;
+  flex-shrink: 0;
+}
+
+.location-info {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 8rpx;
+}
+
+.location-name {
+  font-size: 30rpx;
+  font-weight: 600;
+  color: #1f2937;
+  line-height: 1.4;
+}
+
+.location-address {
+  font-size: 24rpx;
+  color: #6b7280;
+  line-height: 1.4;
+}
+
+.location-time {
+  font-size: 20rpx;
+  color: #9ca3af;
+}
+
+.location-actions {
+  flex-shrink: 0;
+}
+
+.action-btn {
+  width: 72rpx;
+  height: 72rpx;
+  border-radius: 50%;
+  border: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.3s ease;
+}
+
+.navigate-btn {
+  background-color: #10b981;
+}
+
+.action-icon {
+  font-size: 28rpx;
+  filter: brightness(0) invert(1);
+}
+
+/* 旅行计划列表样式 */
+.trip-list {
+  padding: 32rpx;
+  display: flex;
+  flex-direction: column;
+  gap: 24rpx;
+}
+
+.trip-card {
+  background-color: white;
+  border-radius: 24rpx;
+  padding: 32rpx;
+  display: flex;
+  align-items: center;
+  gap: 24rpx;
+  box-shadow: 0 2rpx 8rpx rgba(0, 0, 0, 0.04);
+  transition: all 0.3s ease;
+}
+
+.trip-card:active {
+  transform: scale(0.98);
+  background-color: #f8f9fa;
+}
+
+.trip-image {
+  width: 120rpx;
+  height: 120rpx;
+  border-radius: 16rpx;
+  flex-shrink: 0;
+}
+
+.trip-info {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 8rpx;
+}
+
+.trip-title {
+  font-size: 30rpx;
+  font-weight: 600;
+  color: #1f2937;
+  line-height: 1.4;
+}
+
+.trip-meta {
+  font-size: 24rpx;
+  color: #6b7280;
+}
+
+.trip-date {
+  font-size: 20rpx;
+  color: #9ca3af;
+}
+
+.trip-status {
+  width: 72rpx;
+  height: 72rpx;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.trip-status.planning {
+  background-color: #dbeafe;
+}
+
+.trip-status.completed {
+  background-color: #dcfce7;
+}
+
+.status-icon {
+  font-size: 28rpx;
+}
+
+/* 空状态样式 */
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 120rpx 32rpx;
+  text-align: center;
+}
+
+.empty-icon {
+  font-size: 96rpx;
+  margin-bottom: 32rpx;
+  opacity: 0.5;
+}
+
+.empty-title {
+  font-size: 32rpx;
+  font-weight: 600;
+  color: #374151;
+  margin-bottom: 16rpx;
+}
+
+.empty-desc {
+  font-size: 26rpx;
+  color: #6b7280;
+  margin-bottom: 48rpx;
+  line-height: 1.5;
+}
+
+.empty-btn {
+  background: linear-gradient(135deg, #6366F1 0%, #3B82F6 100%);
+  color: white;
+  border: none;
+  border-radius: 32rpx;
+  padding: 24rpx 48rpx;
+  font-size: 28rpx;
+  font-weight: 500;
+}
+
+/* 加载状态 */
+.loading-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(255, 255, 255, 0.8);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.loading-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 24rpx;
+}
+
+.loading-text {
+  font-size: 28rpx;
+  color: #6b7280;
+}
+
+/* 响应式适配 */
+@media screen and (max-width: 375px) {
+  .location-card,
+  .trip-card {
+    padding: 24rpx;
+  }
+  
+  .location-image,
+  .trip-image {
+    width: 100rpx;
+    height: 100rpx;
+  }
+}
+
+/* 动画效果 */
+.location-card,
+.trip-card {
+  animation: slideUp 0.3s ease-out;
+}
+
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(20rpx);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.map-section {
+  animation: fadeIn 0.5s ease-out;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* 安全区域适配 */
+.tab-content {
+  padding-bottom: constant(safe-area-inset-bottom);
+  padding-bottom: env(safe-area-inset-bottom);
+}

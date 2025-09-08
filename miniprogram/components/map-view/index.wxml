@@ -1,0 +1,39 @@
+<!-- components/map-view/index.wxml -->
+<view class="map-container" style="height: {{height}}">
+  <map
+    id="{{mapId}}"
+    class="map"
+    latitude="{{latitude}}"
+    longitude="{{longitude}}"
+    scale="{{scale}}"
+    markers="{{markers}}"
+    polyline="{{polylines}}"
+    show-location="{{showLocation}}"
+    enable-3D="{{true}}"
+    enable-overlooking="{{true}}"
+    enable-zoom="{{true}}"
+    enable-scroll="{{true}}"
+    enable-rotate="{{true}}"
+    show-compass="{{true}}"
+    show-scale="{{true}}"
+    bindregionchange="onRegionChange"
+    bindtap="onMapTap" 
+    bindmarkertap="onMarkerTap"
+    bindcallouttap="onCalloutTap"
+    bindcontroltap="onControlTap"
+    bindready="onMapReady"
+  >
+    <!-- 自定义控件插槽 -->
+    <slot name="controls"></slot>
+  </map>
+  
+  <!-- 定位按钮 -->
+  <view class="location-btn" bindtap="getUserLocation">
+    <text class="icon-location">📍</text>
+  </view>
+  
+  <!-- 用户位置信息显示 -->
+  <view class="location-info" wx:if="{{userLocation}}">
+    <text class="location-text">当前位置: {{userLocation.latitude}}, {{userLocation.longitude}}</text>
+  </view>
+</view>

@@ -64,11 +64,21 @@ export interface NavigationResponse {
 async function request<T>(endpoint: string, options: RequestInit = {}): Promise<ApiResponse<T>> {
   try {
     const url = `${API_BASE_URL}${endpoint}`;
+    
+    // 获取认证token
+    const token = localStorage.getItem('auth_token');
+    const headers: HeadersInit = {
+      'Content-Type': 'application/json',
+      ...options.headers,
+    };
+    
+    // 如果有token，添加到请求头
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
+    
     const response = await fetch(url, {
-      headers: {
-        'Content-Type': 'application/json',
-        ...options.headers,
-      },
+      headers,
       ...options,
     });
 
@@ -167,8 +177,73 @@ export const healthApi = {
   }
 };
 
+// 用户认证API
+export const userApi = {
+  // 微信网页授权手机号 - 已注释，后续启用时解除注释
+  // async wechatPhoneAuth(authCode: string): Promise<ApiResponse<{ token: string; user_id: string; phone: string; nickname: string; avatar: string; created_at: string }>> {
+  //   return request('/auth/wechat/phone', {
+  //     method: 'POST',
+  //     body: JSON.stringify({ auth_code: authCode })
+  //   });
+  // },
+
+  // 微信小程序手机号授权 - 已注释，后续启用时解除注释
+  // async miniProgramPhoneAuth(encryptedData: { encryptedData: string; iv: string; sessionKey: string }): Promise<ApiResponse<{ token: string; user_id: string; phone: string; nickname: string; avatar: string; created_at: string }>> {
+  //   return request('/auth/miniprogram/phone', {
+  //     method: 'POST',
+  //     body: JSON.stringify(encryptedData)
+  //   });
+  // },
+
+  // 手机号密码登录
+  async loginWithPhone(phone: string, password: string): Promise<ApiResponse<{ token: string; user_id: string; phone: string; nickname: string; avatar: string; created_at: string }>> {
+    return request('/auth/login', {
+      method: 'POST',
+      body: JSON.stringify({ phone, password })
+    });
+  },
+
+  // 手机号密码注册
+  async registerWithPhone(phone: string, password: string, nickname?: string): Promise<ApiResponse<{ token: string; user_id: string; phone: string; nickname: string; avatar: string; created_at: string }>> {
+    return request('/auth/register', {
+      method: 'POST',
+      body: JSON.stringify({ phone, password, nickname })
+    });
+  },
+
+  // 验证用户认证状态
+  async verifyAuth(): Promise<ApiResponse<{ user_id: string; phone: string; nickname: string; avatar: string }>> {
+    return request('/auth/verify', {
+      method: 'GET'
+    });
+  },
+
+  // 用户登出
+  async logout(): Promise<ApiResponse<{ message: string }>> {
+    return request('/auth/logout', {
+      method: 'POST'
+    });
+  },
+
+  // 更新用户信息
+  async updateProfile(userData: { nickname?: string; avatar?: string }): Promise<ApiResponse<{ user_id: string; phone: string; nickname: string; avatar: string }>> {
+    return request('/user/profile', {
+      method: 'PUT',
+      body: JSON.stringify(userData)
+    });
+  },
+
+  // 获取用户信息
+  async getProfile(): Promise<ApiResponse<{ user_id: string; phone: string; nickname: string; avatar: string; created_at: string }>> {
+    return request('/user/profile', {
+      method: 'GET'
+    });
+  }
+};
+
 export default {
   chatApi,
   locationApi,
-  healthApi
+  healthApi,
+  userApi
 };

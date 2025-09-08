@@ -1,0 +1,130 @@
+<!--pages/chat/index.wxml-->
+<view class="chat-container">
+  <!-- 聊天消息列表 -->
+  <scroll-view 
+    class="messages-container" 
+    scroll-y="{{true}}"
+    scroll-into-view="{{scrollIntoView}}"
+    scroll-top="{{scrollTop}}"
+    bindscroll="onScroll"
+    enhanced="{{true}}"
+    show-scrollbar="{{false}}"
+  >
+    <view class="messages-list">
+      <block wx:for="{{messages}}" wx:key="id">
+        <view 
+          class="message-item {{item.isAI ? 'ai-message' : 'user-message'}}"
+          id="{{item.id}}"
+        >
+          <!-- 时间戳 -->
+          <view class="message-time" wx:if="{{!item.isWelcome}}">
+            {{item.timestamp}}
+          </view>
+          
+          <!-- 消息气泡 -->
+          <view class="message-bubble {{item.isAI ? 'ai-bubble' : 'user-bubble'}}">
+            <text class="message-text">{{item.content}}</text>
+          </view>
+          
+          <!-- 景点列表 -->
+          <view class="attractions-container" wx:if="{{item.attractions && item.attractions.length > 0}}">
+            <view class="attractions-header">
+              <text class="attractions-title">发现 {{item.attractions.length}} 个景点</text>
+              <button 
+                class="add-all-btn" 
+                size="mini"
+                data-attractions="{{item.attractions}}"
+                bindtap="onAddAllAttractions"
+              >
+                批量添加
+              </button>
+            </view>
+            
+            <view class="attractions-list">
+              <block wx:for="{{item.attractions}}" wx:key="id" wx:for-item="attraction">
+                <view class="attraction-card">
+                  <image 
+                    class="attraction-image" 
+                    src="{{attraction.image}}" 
+                    mode="aspectFill"
+                    lazy-load="{{true}}"
+                  />
+                  <view class="attraction-info">
+                    <text class="attraction-name">{{attraction.name}}</text>
+                    <text class="attraction-address">{{attraction.address}}</text>
+                    <view class="attraction-actions">
+                      <button 
+                        class="action-btn navigate-btn" 
+                        size="mini"
+                        data-attraction="{{attraction}}"
+                        bindtap="onNavigateToAttraction"
+                      >
+                        导航
+                      </button>
+                      <button 
+                        class="action-btn add-btn" 
+                        size="mini"
+                        data-attraction="{{attraction}}"
+                        bindtap="onAddAttraction"
+                      >
+                        添加
+                      </button>
+                    </view>
+                  </view>
+                </view>
+              </block>
+            </view>
+          </view>
+        </view>
+      </block>
+      
+      <!-- AI输入中状态 -->
+      <view class="message-item ai-message" wx:if="{{isTyping}}">
+        <view class="message-bubble ai-bubble typing-bubble">
+          <view class="typing-dots">
+            <view class="dot"></view>
+            <view class="dot"></view>
+            <view class="dot"></view>
+          </view>
+        </view>
+      </view>
+    </view>
+  </scroll-view>
+  
+  <!-- 滚动到底部按钮 -->
+  <view class="scroll-to-bottom {{showScrollToBottom ? 'show' : ''}}" bindtap="onScrollToBottomTap">
+    <text class="scroll-icon">⬇</text>
+  </view>
+  
+  <!-- 输入区域 -->
+  <view class="input-container">
+    <view class="input-wrapper">
+      <textarea 
+        class="message-input"
+        placeholder="发送链接或咨询旅行问题..."
+        value="{{inputValue}}"
+        bindinput="onInputChange"
+        maxlength="500"
+        show-confirm-bar="{{false}}"
+        adjust-position="{{true}}"
+        auto-height="{{true}}"
+        cursor-spacing="10"
+      />
+      <button 
+        class="send-btn {{inputValue.length > 0 ? 'active' : ''}}"
+        bindtap="onSendMessage"
+        disabled="{{isTyping || inputValue.length === 0}}"
+      >
+        <text class="send-icon">📤</text>
+      </button>
+    </view>
+    
+    <!-- 功能按钮 -->
+    <view class="function-buttons">
+      <button class="function-btn" size="mini" bindtap="onClearChat">
+        <text class="btn-icon">🗑️</text>
+        <text class="btn-text">清空</text>
+      </button>
+    </view>
+  </view>
+</view>
