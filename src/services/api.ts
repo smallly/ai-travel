@@ -60,13 +60,45 @@ export interface NavigationResponse {
   timestamp: string;
 }
 
+export interface Trip {
+  id: string;
+  title: string;
+  destination: string;
+  start_date: string;
+  end_date: string;
+  budget?: number;
+  status: 'planned' | 'ongoing' | 'completed' | 'cancelled';
+  cover_image?: string;
+  description?: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface TripActivity {
+  id: string;
+  trip_id: string;
+  day_number: number;
+  title: string;
+  description?: string;
+  location?: string;
+  start_time?: string;
+  end_time?: string;
+  estimated_cost?: number;
+  activity_type: 'sightseeing' | 'dining' | 'shopping' | 'entertainment' | 'transportation' | 'accommodation' | 'other';
+  created_at: string;
+}
+
+export interface TripDetails extends Trip {
+  activities?: TripActivity[];
+}
+
 // 通用请求函数
 async function request<T>(endpoint: string, options: RequestInit = {}): Promise<ApiResponse<T>> {
   try {
     const url = `${API_BASE_URL}${endpoint}`;
     
     // 获取认证token
-    const token = localStorage.getItem('auth_token');
+    const token = localStorage.getItem('access_token');
     const headers: HeadersInit = {
       'Content-Type': 'application/json',
       ...options.headers,
@@ -196,7 +228,7 @@ export const userApi = {
   // },
 
   // 手机号密码登录
-  async loginWithPhone(phone: string, password: string): Promise<ApiResponse<{ token: string; user_id: string; phone: string; nickname: string; avatar: string; created_at: string }>> {
+  async loginWithPhone(phone: string, password: string): Promise<ApiResponse<{ user: any; access_token: string; refresh_token: string; expires_in: number }>> {
     return request('/auth/login', {
       method: 'POST',
       body: JSON.stringify({ phone, password })
@@ -204,7 +236,7 @@ export const userApi = {
   },
 
   // 手机号密码注册
-  async registerWithPhone(phone: string, password: string, nickname?: string): Promise<ApiResponse<{ token: string; user_id: string; phone: string; nickname: string; avatar: string; created_at: string }>> {
+  async registerWithPhone(phone: string, password: string, nickname?: string): Promise<ApiResponse<{ user: any; access_token: string; refresh_token: string; expires_in: number }>> {
     return request('/auth/register', {
       method: 'POST',
       body: JSON.stringify({ phone, password, nickname })
@@ -238,6 +270,84 @@ export const userApi = {
     return request('/user/profile', {
       method: 'GET'
     });
+  },
+
+  // 刷新访问令牌
+  async refreshToken(refreshToken: string): Promise<ApiResponse<{ access_token: string; refresh_token: string; expires_in: number }>> {
+    return request('/auth/refresh', {
+      method: 'POST',
+      body: JSON.stringify({ refresh_token: refreshToken })
+    });
+  }
+};
+
+// 行程管理API
+export const tripApi = {
+  // 获取用户行程列表
+  async getUserTrips(): Promise<ApiResponse<Trip[]>> {
+    return request('/trips');
+  },
+
+  // 创建新行程
+  async createTrip(tripData: {
+    title: string;
+    destination: string;
+    start_date: string;
+    end_date: string;
+    budget?: number;
+    cover_image?: string;
+    description?: string;
+  }): Promise<ApiResponse<Trip>> {
+    return request('/trips', {
+      method: 'POST',
+      body: JSON.stringify(tripData)
+    });
+  },
+
+  // 获取行程详情
+  async getTripDetails(tripId: string): Promise<ApiResponse<TripDetails>> {
+    return request(`/trips/${tripId}`);
+  },
+
+  // 更新行程信息
+  async updateTrip(tripId: string, updates: {
+    title?: string;
+    destination?: string;
+    start_date?: string;
+    end_date?: string;
+    budget?: number;
+    cover_image?: string;
+    description?: string;
+    status?: 'planned' | 'ongoing' | 'completed' | 'cancelled';
+  }): Promise<ApiResponse<Trip>> {
+    return request(`/trips/${tripId}`, {
+      method: 'PUT',
+      body: JSON.stringify(updates)
+    });
+  },
+
+  // 删除行程
+  async deleteTrip(tripId: string): Promise<ApiResponse<{ message: string }>> {
+    return request(`/trips/${tripId}`, {
+      method: 'DELETE'
+    });
+  },
+
+  // 添加行程活动
+  async addTripActivity(tripId: string, activityData: {
+    day_number: number;
+    title: string;
+    description?: string;
+    location?: string;
+    start_time?: string;
+    end_time?: string;
+    estimated_cost?: number;
+    activity_type?: 'sightseeing' | 'dining' | 'shopping' | 'entertainment' | 'transportation' | 'accommodation' | 'other';
+  }): Promise<ApiResponse<TripActivity>> {
+    return request(`/trips/${tripId}/activities`, {
+      method: 'POST',
+      body: JSON.stringify(activityData)
+    });
   }
 };
 
@@ -245,5 +355,6 @@ export default {
   chatApi,
   locationApi,
   healthApi,
-  userApi
+  userApi,
+  tripApi
 };

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useLayoutEffect, useCallback, useRef } from 'react';
 import { BrowserRouter as Router, Routes, Route, useNavigate, useParams } from 'react-router-dom';
-import { chatApi } from './services/api';
+import { chatApi, tripApi, Trip } from './services/api';
 import RealMap from './components/RealMap';
 import TripDetailPage from './components/TripDetailPage';
 import PlanningTripDetail from './components/PlanningTripDetail';
@@ -82,7 +82,7 @@ interface TravelPlan {
   endDate?: string;
 }
 
-type Screen = 'login' | 'register' | 'main' | 'editProfile' | 'tripDetail' | 'locationDetail';
+type Screen = 'main' | 'editProfile' | 'tripDetail' | 'locationDetail';
 type Tab = 'chat' | 'itinerary' | 'profile';
 
 // 最简单的FormInput，暂时不用ref，只测试不失焦功能
@@ -175,8 +175,8 @@ const ChatInput = React.memo<{
 
 // 主应用组件（包含认证逻辑）
 function AppContent() {
-  const { user, isLoading, isAuthenticated } = useUser();
-  const [currentScreen, setCurrentScreen] = useState<Screen>('login');
+  const { user, isLoading, isAuthenticated, setShowLoginModal, showLoginModal } = useUser();
+  const [currentScreen, setCurrentScreen] = useState<Screen>('main');
   const [currentTab, setCurrentTab] = useState<Tab>('chat');
   const [currentItineraryTab, setCurrentItineraryTab] = useState<'pending' | 'planning' | 'completed'>('planning');
   const [showPassword, setShowPassword] = useState(false);
@@ -201,12 +201,15 @@ function AppContent() {
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
   const [selectedTrip, setSelectedTrip] = useState<TravelPlan | null>(null);
   const [selectedLocation, setSelectedLocation] = useState<Location | null>(null);
+  // 用户行程状态
+  const [userTrips, setUserTrips] = useState<Trip[]>([]);
+  const [isLoadingTrips, setIsLoadingTrips] = useState(false);
+  
   const [toast, setToast] = useState<{ message: string; visible: boolean }>({ 
     message: '', 
     visible: false 
   });
-  // 登录弹窗状态
-  const [showLogin, setShowLogin] = useState(false);
+  // 登录弹窗状态由UserContext管理
   const [deleteConfirm, setDeleteConfirm] = useState<{
     visible: boolean;
     locationId: string;
@@ -369,132 +372,60 @@ function AppContent() {
     }
   ]);
 
-  // 示例数据 - 更新包含更多状态和详细信息
-  const travelPlans: TravelPlan[] = [
-    {
-      id: '1',
-      title: '青岛三天旅游计划',
-      duration: '3天2晚',
-      locations: 8,
-      image: 'https://images.pexels.com/photos/2901209/pexels-photo-2901209.jpeg?auto=compress&cs=tinysrgb&w=400',
-      status: 'planning',
-      province: '山东省',
-      centerCoordinates: { lat: 36.0661, lng: 120.3694 },
-      destination: '青岛市',
-      startDate: '2024-03-15',
-      endDate: '2024-03-17',
-      createdAt: '2024-03-01',
-      attractionList: [
-        {
-          id: '1-1',
-          name: '青岛栈桥',
-          address: '山东省青岛市市南区太平路12号',
-          image: 'https://images.pexels.com/photos/2901209/pexels-photo-2901209.jpeg?auto=compress&cs=tinysrgb&w=400',
-          description: '青岛标志性景点，百年历史的海上桥梁',
-          coordinates: { lat: 36.0581, lng: 120.3203 }
-        },
-        {
-          id: '1-2',
-          name: '八大关风景区',
-          address: '山东省青岛市市南区山海关路',
-          image: 'https://images.pexels.com/photos/2901209/pexels-photo-2901209.jpeg?auto=compress&cs=tinysrgb&w=400',
-          description: '欧式建筑群，青岛最美的地方',
-          coordinates: { lat: 36.0458, lng: 120.3331 }
-        },
-        {
-          id: '1-3',
-          name: '青岛啤酒博物馆',
-          address: '山东省青岛市市北区登州路56-1号',
-          image: 'https://images.pexels.com/photos/2901209/pexels-photo-2901209.jpeg?auto=compress&cs=tinysrgb&w=400',
-          description: '了解青岛啤酒历史，品尝新鲜啤酒',
-          coordinates: { lat: 36.0785, lng: 120.3661 }
-        }
-      ]
-    },
-    {
-      id: '2',
-      title: '北京故宫深度游',
-      duration: '2天1晚',
-      locations: 5,
-      image: 'https://images.pexels.com/photos/1591373/pexels-photo-1591373.jpeg?auto=compress&cs=tinysrgb&w=400',
-      status: 'planning',
-      centerCoordinates: { lat: 39.9163, lng: 116.3972 },
-      destination: '北京故宫',
-      startDate: '2024-02-10',
-      endDate: '2024-02-11',
-      createdAt: '2024-02-01',
-      attractionList: [
-        {
-          id: '2-1',
-          name: '故宫博物院',
-          address: '北京市东城区景山前街4号',
-          image: 'https://images.pexels.com/photos/1591373/pexels-photo-1591373.jpeg?auto=compress&cs=tinysrgb&w=400',
-          description: '明清两代的皇家宫殿，世界文化遗产',
-          coordinates: { lat: 39.9163, lng: 116.3972 }
-        },
-        {
-          id: '2-2',
-          name: '天安门广场',
-          address: '北京市东城区东长安街',
-          image: 'https://images.pexels.com/photos/1591373/pexels-photo-1591373.jpeg?auto=compress&cs=tinysrgb&w=400',
-          description: '世界最大的城市广场，中国象征',
-          coordinates: { lat: 39.9042, lng: 116.4074 }
-        }
-      ]
-    },
-    {
-      id: '3',
-      title: '杭州西湖游',
-      duration: '1天',
-      locations: 6,
-      image: 'https://images.pexels.com/photos/2901209/pexels-photo-2901209.jpeg?auto=compress&cs=tinysrgb&w=400',
-      status: 'planning',
-      province: '浙江省',
-      centerCoordinates: { lat: 30.2741, lng: 120.1551 },
-      destination: '杭州西湖',
-      createdAt: '2024-03-10',
-      attractionList: [
-        {
-          id: '3-1',
-          name: '西湖断桥残雪',
-          address: '浙江省杭州市西湖区白堤',
-          image: 'https://images.pexels.com/photos/2901209/pexels-photo-2901209.jpeg?auto=compress&cs=tinysrgb&w=400',
-          description: '西湖十景之一，白娘子传说发生地',
-          coordinates: { lat: 30.2634, lng: 120.1439 }
-        },
-        {
-          id: '3-2',
-          name: '雷峰塔',
-          address: '浙江省杭州市西湖区南山路15号',
-          image: 'https://images.pexels.com/photos/2901209/pexels-photo-2901209.jpeg?auto=compress&cs=tinysrgb&w=400',
-          description: '西湖标志性古塔，白娘子传说经典场景',
-          coordinates: { lat: 30.2319, lng: 120.1477 }
-        }
-      ]
-    },
-    {
-      id: '4',
-      title: '成都美食之旅',
-      duration: '4天3晚',
-      locations: 12,
-      image: 'https://images.pexels.com/photos/2901209/pexels-photo-2901209.jpeg?auto=compress&cs=tinysrgb&w=400',
-      status: 'planning',
-      province: '四川省',
-      centerCoordinates: { lat: 30.5728, lng: 104.0668 },
-      destination: '成都市',
-      createdAt: '2024-03-12',
-      attractionList: [
-        {
-          id: '4-1',
-          name: '宽窄巷子',
-          address: '四川省成都市青羊区同仁路以东长顺街以西',
-          image: 'https://images.pexels.com/photos/2901209/pexels-photo-2901209.jpeg?auto=compress&cs=tinysrgb&w=400',
-          description: '成都历史文化街区，体验老成都风情',
-          coordinates: { lat: 30.6759, lng: 104.0570 }
-        }
-      ]
+  // 获取用户行程数据
+  const fetchUserTrips = useCallback(async () => {
+    if (!isAuthenticated) return;
+    
+    setIsLoadingTrips(true);
+    try {
+      const response = await tripApi.getUserTrips();
+      if (response.success && response.data) {
+        setUserTrips(response.data);
+      } else {
+        console.error('获取行程失败:', response.error);
+        showToast('获取行程失败，请稍后重试');
+      }
+    } catch (error) {
+      console.error('获取行程异常:', error);
+      showToast('网络错误，请稍后重试');
+    } finally {
+      setIsLoadingTrips(false);
     }
-  ];
+  }, [isAuthenticated]);
+
+  // 用户登录后获取行程数据
+  useEffect(() => {
+    if (isAuthenticated) {
+      fetchUserTrips();
+    }
+  }, [isAuthenticated, fetchUserTrips]);
+
+  // 将Trip数据转换为TravelPlan格式的函数
+  const convertTripToTravelPlan = (trip: Trip): TravelPlan => {
+    const daysCount = Math.ceil((new Date(trip.end_date).getTime() - new Date(trip.start_date).getTime()) / (1000 * 60 * 60 * 24)) + 1;
+    return {
+      id: trip.id,
+      title: trip.title,
+      duration: `${daysCount}天${daysCount-1}晚`,
+      locations: 0, // 暂时设为0，后续可从activities计算
+      image: trip.cover_image || 'https://images.pexels.com/photos/2901209/pexels-photo-2901209.jpeg?auto=compress&cs=tinysrgb&w=400',
+      status: trip.status === 'completed' ? 'completed' as const : 'planning' as const,
+      province: '', // 从destination提取
+      centerCoordinates: { lat: 0, lng: 0 }, // 默认坐标
+      destination: trip.destination,
+      startDate: trip.start_date,
+      endDate: trip.end_date,
+      createdAt: trip.created_at.split('T')[0],
+      attractionList: [] // 从activities转换而来
+    };
+  };
+
+  // 将用户行程转换为TravelPlan格式
+  const travelPlansFromUser = userTrips.map(convertTripToTravelPlan);
+
+
+  // 只使用真实用户数据，不显示示例数据
+  const travelPlans = travelPlansFromUser;
 
   // 显示toast提示
   const showToast = useCallback((message: string) => {
@@ -657,17 +588,17 @@ function AppContent() {
     }
   };
 
-  // 登录处理
-  const handleLogin = (e: React.FormEvent) => {
-    e.preventDefault();
-    setCurrentScreen('main');
-  };
+  // 登录处理 - 已移除，现在使用弹窗形式
+  // const handleLogin = (e: React.FormEvent) => {
+  //   e.preventDefault();
+  //   setCurrentScreen('main');
+  // };
 
-  // 注册处理
-  const handleRegister = (e: React.FormEvent) => {
-    e.preventDefault();
-    setCurrentScreen('main');
-  };
+  // 注册处理 - 已移除，现在使用弹窗形式
+  // const handleRegister = (e: React.FormEvent) => {
+  //   e.preventDefault();
+  //   setCurrentScreen('main');
+  // };
 
   // 清理AI文本，移除经纬度等技术信息
   const cleanAIText = useCallback((text: string): string => {
@@ -722,7 +653,7 @@ function AppContent() {
   const handleSendMessage = useCallback(async (messageText: string) => {
     // 检查用户是否已登录
     if (!isAuthenticated) {
-      setShowLogin(true);
+      setShowLoginModal(true);
       return;
     }
 
@@ -780,16 +711,12 @@ function AppContent() {
     }
   }, [isAuthenticated, cleanAIText]);
 
-  // 初始化用户认证状态
+  // 初始化用户认证状态 - 移除会切换到登录页面的逻辑
   useEffect(() => {
     if (!isLoading) {
-      if (isAuthenticated) {
-        setCurrentScreen('main');
-        setCurrentTab('chat');
-      } else {
-        setCurrentScreen('main'); // 直接进入主界面，但需要在发送消息时检查登录状态
-        setCurrentTab('chat');
-      }
+      // 无论是否已认证，都保持在主界面
+      // 在需要登录时通过弹窗形式提示用户登录
+      setCurrentTab('chat');
     }
   }, [isLoading, isAuthenticated]);
 
@@ -868,157 +795,7 @@ function AppContent() {
     setShowLogoutConfirm(false);
   };
 
-  // 登录页面
-  const LoginScreen = () => (
-    <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-purple-50 to-pink-50 flex flex-col relative overflow-hidden max-w-md mx-auto">
-      {/* 背景装饰 */}
-      <div className="absolute inset-0">
-        <div className="absolute top-20 left-10 w-32 h-32 bg-gradient-to-r from-purple-400 to-purple-600 opacity-10 rounded-full blur-xl"></div>
-        <div className="absolute top-40 right-16 w-24 h-24 bg-gradient-to-r from-purple-500 to-blue-500 opacity-10 rounded-full blur-lg"></div>
-        <div className="absolute bottom-32 left-20 w-40 h-40 bg-gradient-to-r from-blue-400 to-purple-400 opacity-5 rounded-full blur-2xl"></div>
-      </div>
-      
-      <div className="flex-1 flex flex-col justify-center px-8 relative z-10">
-        <div className="text-center mb-12">
-          <h1 className="text-3xl font-bold text-gray-800 mb-3 tracking-tight">AI赛博旅伴</h1>
-          <p className="text-gray-600 text-lg">您的智能旅行助手</p>
-        </div>
-
-        <form onSubmit={handleLogin} className="space-y-6">
-          <div className="relative">
-            <Phone className="absolute left-4 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
-            <FormInput
-              type="tel"
-              placeholder="请输入手机号"
-              className="w-full pl-12 pr-4 py-3 bg-white rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-purple-500 text-gray-800 placeholder-gray-400"
-            />
-          </div>
-
-          <div className="relative">
-            <Lock className="absolute left-4 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
-            <FormInput
-              type={showPassword ? 'text' : 'password'}
-              placeholder="请输入密码"
-              className="w-full pl-12 pr-14 py-3 bg-white rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-purple-500 text-gray-800 placeholder-gray-400"
-            />
-            <button
-              type="button"
-              onClick={() => setShowPassword(!showPassword)}
-              className="absolute right-4 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
-            >
-              {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
-            </button>
-          </div>
-
-          <button
-            type="submit"
-            className="w-full py-3 bg-gradient-to-r from-purple-500 to-blue-500 text-white font-bold rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 active:scale-95"
-          >
-            登录
-          </button>
-        </form>
-
-        <div className="text-center mt-8">
-          <button
-            onClick={() => setCurrentScreen('register')}
-            className="text-purple-500 hover:text-purple-600 transition-colors"
-          >
-            还没有账号？立即注册
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-
-  // 注册页面
-  const RegisterScreen = () => (
-    <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-purple-50 to-pink-50 flex flex-col relative overflow-hidden max-w-md mx-auto">
-      {/* 背景装饰 */}
-      <div className="absolute inset-0">
-        <div className="absolute top-20 left-10 w-32 h-32 bg-gradient-to-r from-purple-400 to-purple-600 opacity-10 rounded-full blur-xl"></div>
-        <div className="absolute top-40 right-16 w-24 h-24 bg-gradient-to-r from-purple-500 to-blue-500 opacity-10 rounded-full blur-lg"></div>
-        <div className="absolute bottom-32 left-20 w-40 h-40 bg-gradient-to-r from-blue-400 to-purple-400 opacity-5 rounded-full blur-2xl"></div>
-      </div>
-
-      <div className="flex items-center justify-center p-6 relative z-10">
-        <button
-          onClick={() => setCurrentScreen('login')}
-          className="absolute left-6 text-gray-600 p-2 hover:bg-gray-100 rounded-full transition-colors"
-        >
-          <ArrowLeft className="w-6 h-6" />
-        </button>
-        <h2 className="text-xl font-semibold text-gray-800">注册账号</h2>
-      </div>
-
-      <div className="flex-1 px-8 py-4 relative z-10">
-        <form onSubmit={handleRegister} className="space-y-5">
-          <div className="relative">
-            <Phone className="absolute left-4 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
-            <FormInput
-              type="tel"
-              placeholder="请输入手机号"
-              className="w-full pl-12 pr-4 py-3 bg-white rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-purple-500 text-gray-800 placeholder-gray-400"
-            />
-          </div>
-
-          <div className="flex gap-3">
-            <div className="flex-1 relative">
-              <div className="w-5 h-5 text-gray-400 absolute left-4 top-1/2 transform -translate-y-1/2">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <path d="M9 12l2 2 4-4"/>
-                  <path d="M21 12c-1 0-3-1-3-3s2-3 3-3 3 1 3 3-2 3-3 3"/>
-                  <path d="M3 12c1 0 3-1 3-3s-2-3-3-3-3 1-3 3 2 3 3 3"/>
-                </svg>
-              </div>
-              <FormInput
-                type="text"
-                placeholder="验证码"
-                className="w-full pl-12 pr-4 py-3 bg-white rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-purple-500 text-gray-800 placeholder-gray-400"
-              />
-            </div>
-            <button
-              type="button"
-              className="px-4 py-3 bg-gradient-to-r from-purple-500 to-blue-500 text-white rounded-xl hover:shadow-lg transition-all font-medium"
-            >
-              获取验证码
-            </button>
-          </div>
-
-          <div className="relative">
-            <Lock className="absolute left-4 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
-            <FormInput
-              type={showPassword ? 'text' : 'password'}
-              placeholder="请设置密码"
-              className="w-full pl-12 pr-14 py-3 bg-white rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-purple-500 text-gray-800 placeholder-gray-400"
-            />
-            <button
-              type="button"
-              onClick={() => setShowPassword(!showPassword)}
-              className="absolute right-4 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
-            >
-              {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
-            </button>
-          </div>
-
-          <div className="relative">
-            <Lock className="absolute left-4 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
-            <FormInput
-              type="password"
-              placeholder="确认密码"
-              className="w-full pl-12 pr-4 py-3 bg-white rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-purple-500 text-gray-800 placeholder-gray-400"
-            />
-          </div>
-
-          <button
-            type="submit"
-            className="w-full py-3 bg-gradient-to-r from-purple-500 to-blue-500 text-white font-bold rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 active:scale-95 mt-8"
-          >
-            注册
-          </button>
-        </form>
-      </div>
-    </div>
-  );
+  // 登录和注册页面组件已移除，现在使用弹窗形式
 
   // 编辑个人信息页面
   const EditProfileScreen = () => (
@@ -1140,10 +917,8 @@ function AppContent() {
     </div>
   );
 
-  // 景点卡片组件
-  const AttractionCard = ({ attraction, onAddToItinerary, isAdded }: { attraction: Attraction; onAddToItinerary?: (attraction: Attraction) => void; isAdded?: boolean }) => {
-    // 添加调试日志
-    console.log('AttractionCard 接收到的数据:', attraction);
+  // 景点卡片组件 - 使用React.memo优化性能
+  const AttractionCard = React.memo(({ attraction, onAddToItinerary, isAdded }: { attraction: Attraction; onAddToItinerary?: (attraction: Attraction) => void; isAdded?: boolean }) => {
     
     return (
       <div className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100 mb-3">
@@ -1186,7 +961,7 @@ function AppContent() {
         </div>
       </div>
     );
-  };
+  });
 
   // 聊天页面
   const ChatScreen = () => (
@@ -1371,7 +1146,20 @@ function AppContent() {
                 <div className="w-16 h-16 bg-gray-50 rounded-full flex items-center justify-center mx-auto mb-4 shadow-sm">
                   <Calendar className="w-8 h-8 text-gray-400" />
                 </div>
-                <p className="text-gray-500">暂无规划中的行程</p>
+                <p className="text-gray-500 mb-4">
+                  {isAuthenticated 
+                    ? (isLoadingTrips ? '正在加载行程数据...' : '暂无规划中的行程')
+                    : '请登录查看您的行程'
+                  }
+                </p>
+                {!isAuthenticated && (
+                  <button
+                    onClick={() => setShowLoginModal(true)}
+                    className="px-6 py-2 bg-gradient-to-r from-purple-500 to-blue-500 text-white font-medium rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 active:scale-95"
+                  >
+                    立即登录
+                  </button>
+                )}
               </div>
             )}
           </div>
@@ -1427,7 +1215,7 @@ function AppContent() {
           }`}
           onClick={() => {
             if (!isAuthenticated) {
-              setShowLogin(true);
+              setShowLoginModal(true);
             }
           }}
         >
@@ -1710,19 +1498,27 @@ function AppContent() {
 
   return (
     <div className="app-container min-h-screen bg-white">
-      {/* 登录页面 */}
-      {currentScreen === 'login' && <LoginScreen />}
-      
-      {/* 注册页面 */}
-      {currentScreen === 'register' && <RegisterScreen />}
-      
       {/* 编辑个人信息页面 */}
       {currentScreen === 'editProfile' && <EditProfileScreen />}
       
       {/* 关于我们页面 */}
       {showAbout && <AboutScreen />}
       
-      {/* 主应用界面 */}
+      {/* 行程详情页面 */}
+      {currentScreen === 'tripDetail' && selectedTrip && (
+        <TripDetailPage 
+          trip={selectedTrip}
+          onBack={handleCloseTripDetail}
+          onNavigate={navigateToLocation}
+        />
+      )}
+
+      {/* 地点详情页面 */}
+      {currentScreen === 'locationDetail' && selectedLocation && (
+        <LocationDetailScreen />
+      )}
+      
+      {/* 主应用界面 - 默认显示 */}
       {currentScreen === 'main' && !showAbout && <MainScreen />}
       
       {/* 退出确认弹窗 */}
@@ -1740,27 +1536,13 @@ function AppContent() {
 
       {/* 登录弹窗 */}
       <LoginModal
-        isOpen={showLogin}
-        onClose={() => setShowLogin(false)}
+        isOpen={showLoginModal}
+        onClose={() => setShowLoginModal(false)}
         onAuthSuccess={() => {
-          setShowLogin(false);
+          setShowLoginModal(false);
           showToast('登录成功！');
         }}
       />
-      
-      {/* 行程详情页面 */}
-      {currentScreen === 'tripDetail' && selectedTrip && (
-        <TripDetailPage 
-          trip={selectedTrip}
-          onBack={handleCloseTripDetail}
-          onNavigate={navigateToLocation}
-        />
-      )}
-
-      {/* 地点详情页面 */}
-      {currentScreen === 'locationDetail' && selectedLocation && (
-        <LocationDetailScreen />
-      )}
     </div>
   );
 }

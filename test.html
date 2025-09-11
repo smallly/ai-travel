@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>测试页面</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; }
+        .status { margin: 10px 0; padding: 10px; border-radius: 5px; }
+        .success { background: #d4edda; color: #155724; }
+        .error { background: #f8d7da; color: #721c24; }
+    </style>
+</head>
+<body>
+    <h1>React 应用测试</h1>
+    <div id="test-results">
+        <p>正在检测...</p>
+    </div>
+    
+    <script>
+        // 测试应用状态
+        async function testApp() {
+            const results = document.getElementById('test-results');
+            let html = '';
+            
+            // 检查前端服务
+            try {
+                const response = await fetch('http://localhost:5173');
+                html += '<div class="status success">✅ 前端服务运行正常 (端口 5173)</div>';
+            } catch (e) {
+                html += '<div class="status error">❌ 前端服务连接失败</div>';
+            }
+            
+            // 检查后端服务
+            try {
+                const response = await fetch('http://127.0.0.1:5000/api/health');
+                const data = await response.json();
+                html += '<div class="status success">✅ 后端服务运行正常: ' + data.message + '</div>';
+            } catch (e) {
+                html += '<div class="status error">❌ 后端服务连接失败</div>';
+            }
+            
+            // 检查React应用
+            const rootElement = document.createElement('iframe');
+            rootElement.src = 'http://localhost:5173';
+            rootElement.style.width = '100%';
+            rootElement.style.height = '600px';
+            rootElement.style.border = '1px solid #ddd';
+            rootElement.style.marginTop = '20px';
+            
+            html += '<div class="status success">✅ React 应用预览:</div>';
+            results.innerHTML = html;
+            results.appendChild(rootElement);
+        }
+        
+        testApp();
+    </script>
+</body>
+</html>

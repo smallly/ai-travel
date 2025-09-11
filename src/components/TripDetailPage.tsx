@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { ArrowLeft, MapPin, Calendar, Clock, Map, Navigation, Maximize, Minimize } from 'lucide-react';
 import RealMap from './RealMap';
 
@@ -43,6 +43,43 @@ const TripDetailPage: React.FC<TripDetailPageProps> = ({
   onNavigate 
 }) => {
   const [isMapFullscreen, setIsMapFullscreen] = useState(false);
+  const [activeDay, setActiveDay] = useState(1);
+
+  // 监听滚动，更新当前激活的Day
+  useEffect(() => {
+    const scrollContainer = document.querySelector('.overflow-y-auto');
+    if (!scrollContainer) return;
+
+    const handleScroll = () => {
+      const days = Math.ceil((trip.duration?.includes('天') ? parseInt(trip.duration) : 1));
+      let currentActiveDay = 1;
+      
+      // 获取所有day元素的位置
+      for (let i = 1; i <= days; i++) {
+        const dayElement = document.getElementById(`day-${i}`);
+        if (dayElement) {
+          const rect = dayElement.getBoundingClientRect();
+          const containerRect = scrollContainer.getBoundingClientRect();
+          
+          // 如果Day元素的顶部在视窗范围内（考虑tab高度偏移）
+          if (rect.top - containerRect.top <= 100) {
+            currentActiveDay = i;
+          }
+        }
+      }
+      
+      setActiveDay(currentActiveDay);
+    };
+
+    scrollContainer.addEventListener('scroll', handleScroll);
+    // 初始调用一次
+    handleScroll();
+
+    return () => {
+      scrollContainer.removeEventListener('scroll', handleScroll);
+    };
+  }, [trip.duration]);
+
   const getStatusIcon = (status: string) => {
     switch (status) {
       case 'planning':
@@ -113,6 +150,11 @@ const TripDetailPage: React.FC<TripDetailPageProps> = ({
                 <span className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusBgColor(trip.status)}`}>
                   {getStatusText(trip.status)}
                 </span>
+                {trip.createdAt && (
+                  <span className="text-xs text-gray-500">
+                    {trip.createdAt}
+                  </span>
+                )}
               </div>
               <div className="text-sm text-gray-600 space-y-1">
                 <div className="flex items-center gap-4">
@@ -125,57 +167,73 @@ const TripDetailPage: React.FC<TripDetailPageProps> = ({
                     <span>{trip.locations} 个地点</span>
                   </div>
                 </div>
-                {trip.createdAt && (
-                  <div className="flex items-center gap-2">
-                    <Calendar className="w-4 h-4" />
-                    <span>创建于 {trip.createdAt}</span>
-                  </div>
-                )}
               </div>
             </div>
           </div>
 
-          {/* 天数快速定位标签 */}
-          <div className="mb-6">
-            <div className="flex bg-gray-100 rounded-xl p-1">
-              {(() => {
-                const days = Math.ceil((trip.duration?.includes('天') ? parseInt(trip.duration) : 1));
-                return Array.from({ length: days }, (_, index) => {
-                  const dayNumber = index + 1;
-                  return (
-                    <button
-                      key={dayNumber}
-                      onClick={() => {
-                        // 快速定位到对应的Day
-                        const dayElement = document.getElementById(`day-${dayNumber}`);
-                        if (dayElement) {
-                          dayElement.scrollIntoView({ 
-                            behavior: 'smooth', 
-                            block: 'start' 
+
+        </div>
+
+        {/* 天数快速定位标签 - 置顶固定 */}
+        <div className="sticky top-0 z-20 bg-white border-b border-gray-100 px-4 py-3">
+          <div className="flex bg-gray-100 rounded-xl p-1">
+            {(() => {
+              const days = Math.ceil((trip.duration?.includes('天') ? parseInt(trip.duration) : 1));
+              return Array.from({ length: days }, (_, index) => {
+                const dayNumber = index + 1;
+                return (
+                  <button
+                    key={dayNumber}
+                    onClick={() => {
+                      // 快速定位到对应的Day，考虑置顶tab的高度
+                      const dayElement = document.getElementById(`day-${dayNumber}`);
+                      if (dayElement) {
+                        const rect = dayElement.getBoundingClientRect();
+                        const scrollContainer = dayElement.closest('.overflow-y-auto');
+                        if (scrollContainer) {
+                          const containerRect = scrollContainer.getBoundingClientRect();
+                          const offset = rect.top - containerRect.top + scrollContainer.scrollTop - 80; // 80px为tab高度的偏移
+                          scrollContainer.scrollTo({
+                            top: offset,
+                            behavior: 'smooth'
                           });
                         }
-                      }}
-                      className="flex-1 py-2 px-4 rounded-lg text-sm font-medium transition-all text-gray-600 hover:text-gray-800 hover:bg-white hover:shadow-sm"
-                    >
-                      DAY {dayNumber}
-                    </button>
-                  );
-                });
-              })()}
-            </div>
+                      }
+                    }}
+                    className={`flex-1 py-2 px-4 rounded-lg text-sm font-medium transition-all ${
+                      activeDay === dayNumber
+                        ? 'bg-white text-blue-600 shadow-sm font-semibold'
+                        : 'text-gray-600 hover:text-gray-800 hover:bg-white hover:shadow-sm'
+                    }`}
+                  >
+                    DAY {dayNumber}
+                  </button>
+                );
+              });
+            })()}
           </div>
+        </div>
 
-          {/* 地图区域 */}
-          <div className={`relative ${isMapFullscreen ? 'fixed inset-0 z-50' : 'h-64'} overflow-hidden transition-all duration-300 rounded-2xl mb-6`}>
+        {/* 地图区域 */}
+        <div className="px-4 mb-6">
+          <div className={`relative ${isMapFullscreen ? 'fixed inset-0 z-50' : 'h-48'} overflow-hidden transition-all duration-300 rounded-2xl`}>
             {/* 地图组件 */}
             <RealMap 
               locations={
-                (trip.attractionList || []).map(attraction => ({
-                  id: attraction.id,
-                  name: attraction.name,
-                  address: attraction.address,
-                  realCoordinates: attraction.coordinates
-                }))
+                (trip.attractionList || []).map((attraction, index) => {
+                  // 计算每天的景点分配
+                  const days = Math.ceil((trip.duration?.includes('天') ? parseInt(trip.duration) : 1));
+                  const attractionsPerDay = Math.ceil(trip.attractionList.length / days);
+                  const dayNumber = Math.floor(index / attractionsPerDay) + 1;
+                  
+                  return {
+                    id: attraction.id,
+                    name: attraction.name,
+                    address: attraction.address,
+                    dayNumber: dayNumber,
+                    realCoordinates: attraction.coordinates
+                  };
+                })
               }
               className="absolute inset-0 w-full h-full"
               onLocationClick={(location) => {
@@ -184,7 +242,7 @@ const TripDetailPage: React.FC<TripDetailPageProps> = ({
             />
             
             {/* 地图控制按钮 */}
-            <div className="absolute top-4 right-4 flex flex-col gap-2 z-10">
+            <div className="absolute bottom-4 right-4 flex flex-col gap-2 z-10">
               <button 
                 onClick={() => setIsMapFullscreen(!isMapFullscreen)}
                 className="w-10 h-10 bg-white rounded-full shadow-md flex items-center justify-center hover:bg-gray-50 transition-colors"
@@ -248,7 +306,7 @@ const TripDetailPage: React.FC<TripDetailPageProps> = ({
                           <div key={attraction.id} className="bg-gray-50 rounded-2xl p-4">
                             <div className="flex items-start gap-3">
                               {/* 时间序号 */}
-                              <div className="w-6 h-6 bg-blue-500 text-white rounded-full flex items-center justify-center text-xs font-medium flex-shrink-0">
+                              <div className="text-sm font-medium text-gray-800 flex-shrink-0 w-4">
                                 {index + 1}
                               </div>
                               

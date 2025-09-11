@@ -9,14 +9,21 @@ import logging
 import requests
 import re
 from datetime import datetime
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, g
 from flask_sqlalchemy import SQLAlchemy
 from flask_cors import CORS
+# from flask_bcrypt import Bcrypt
+# from flask_limiter import Limiter
+# from flask_limiter.util import get_remote_address
 from logging.handlers import RotatingFileHandler
+from sqlalchemy.exc import IntegrityError
 import pytz
 
 # 导入配置管理模块
 from config import app_config, dify_config, nav_config, log_config, validate_all_configs
+
+# 导入认证工具
+from utils.auth_utils import PasswordManager, TokenManager, token_required, validate_phone
 
 # 验证配置
 if not validate_all_configs():
@@ -39,11 +46,44 @@ CORS(app, origins=app_config.CORS_ORIGINS)
 import os
 os.makedirs('database', exist_ok=True)
 os.makedirs(app_config.LOG_DIRECTORY, exist_ok=True)
+os.makedirs('utils', exist_ok=True)
 
-# 初始化数据库
+# 初始化数据库和扩展
 db = SQLAlchemy(app)
+# bcrypt = Bcrypt(app)
+# limiter = Limiter(app, key_func=get_remote_address)
 
 # 配置日志 - 使用统一配置管理
+class EmojiFilter(logging.Filter):
+    """过滤emoji字符以避免控制台编码错误"""
+    def filter(self, record):
+        if hasattr(record, 'msg'):
+            # 移除emoji字符，保留基本信息
+            import re
+            emoji_pattern = re.compile("["
+                                       u"\U0001F600-\U0001F64F"  # emoticons
+                                       u"\U0001F300-\U0001F5FF"  # symbols & pictographs
+                                       u"\U0001F680-\U0001F6FF"  # transport & map symbols
+                                       u"\U0001F1E0-\U0001F1FF"  # flags (iOS)
+                                       u"\U00002500-\U00002BEF"  # chinese char
+                                       u"\U00002702-\U000027B0"
+                                       u"\U00002702-\U000027B0"
+                                       u"\U000024C2-\U0001F251"
+                                       u"\U0001f926-\U0001f937"
+                                       u"\U00010000-\U0010ffff"
+                                       u"\u2640-\u2642" 
+                                       u"\u2600-\u2B55"
+                                       u"\u200d"
+                                       u"\u23cf"
+                                       u"\u23e9"
+                                       u"\u231a"
+                                       u"\ufe0f"  # dingbats
+                                       u"\u3030"
+                                       "]+", flags=re.UNICODE)
+            if isinstance(record.msg, str):
+                record.msg = emoji_pattern.sub('[EMOJI]', record.msg)
+        return True
+
 def setup_logging():
     """配置日志系统"""
     log_level = getattr(logging, app_config.LOG_LEVEL)
@@ -53,21 +93,28 @@ def setup_logging():
         datefmt=log_config.DATE_FORMAT
     )
     
-    # 文件日志
+    # 文件日志 - 保留完整的emoji
     log_filename = log_config.LOG_FILE_FORMAT.format(
         date=datetime.now().strftime("%Y-%m-%d")
     )
     file_handler = RotatingFileHandler(
         os.path.join(app_config.LOG_DIRECTORY, log_filename),
         maxBytes=app_config.LOG_MAX_BYTES,
-        backupCount=app_config.LOG_BACKUP_COUNT
+        backupCount=app_config.LOG_BACKUP_COUNT,
+        encoding='utf-8'
     )
     file_handler.setFormatter(formatter)
     file_handler.setLevel(log_level)
     
-    # 控制台日志
-    console_handler = logging.StreamHandler()
-    console_handler.setFormatter(formatter)
+    # 控制台日志 - 过滤emoji避免编码问题
+    import sys
+    console_handler = logging.StreamHandler(sys.stdout)
+    console_handler.addFilter(EmojiFilter())
+    simple_formatter = logging.Formatter(
+        '%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+        datefmt='%Y-%m-%d %H:%M:%S'
+    )
+    console_handler.setFormatter(simple_formatter)
     console_handler.setLevel(log_level)
     
     app.logger.addHandler(file_handler)
@@ -96,11 +143,11 @@ class User(db.Model):
     
     def set_password(self, password):
         """设置密码"""
-        self.password_hash = generate_password_hash(password)
+        self.password_hash = PasswordManager.hash_password(password)
     
     def check_password(self, password):
         """验证密码"""
-        return check_password_hash(self.password_hash, password)
+        return PasswordManager.verify_password(password, self.password_hash)
     
     def to_dict(self):
         beijing_tz = pytz.timezone(os.getenv('TIMEZONE', 'Asia/Shanghai'))
@@ -922,133 +969,261 @@ def send_message():
 #         app.logger.error(f'小程序授权失败: {str(e)}')
 #         return jsonify({'success': False, 'error': str(e)}), 500
 
-# 手机号密码注册
+# 手机号密码注册 - 增强版
 @app.route('/api/auth/register', methods=['POST'])
+# @limiter.limit("3 per minute")
 def register_with_phone():
-    """手机号密码注册"""
+    """手机号密码注册 - 增强版"""
     try:
         data = request.get_json()
         phone = data.get('phone', '').strip()
         password = data.get('password', '').strip()
         nickname = data.get('nickname', '').strip()
+        ip_address = request.environ.get('HTTP_X_REAL_IP', request.remote_addr)
         
-        # 验证输入数据
-        if not phone:
-            return jsonify({'success': False, 'error': '手机号不能为空'}), 400
+        # 1. 基础验证
+        if not phone or not password:
+            return jsonify({
+                'success': False, 
+                'error': '手机号和密码不能为空',
+                'code': 'MISSING_REQUIRED_FIELDS'
+            }), 400
         
-        if not password:
-            return jsonify({'success': False, 'error': '密码不能为空'}), 400
+        # 2. 手机号格式验证
+        if not validate_phone(phone):
+            return jsonify({
+                'success': False, 
+                'error': '请输入正确的11位手机号',
+                'code': 'INVALID_PHONE_FORMAT'
+            }), 400
         
-        # 验证手机号格式
-        phone_pattern = r'^1[3-9]\d{9}$'
-        if not re.match(phone_pattern, phone):
-            return jsonify({'success': False, 'error': '请输入正确的手机号'}), 400
+        # 3. 密码强度验证
+        password_validation = PasswordManager.validate_password_strength(password)
+        if not password_validation['valid']:
+            return jsonify({
+                'success': False,
+                'error': password_validation['errors'][0],
+                'code': 'WEAK_PASSWORD'
+            }), 400
         
-        # 验证密码强度
-        if len(password) < 6:
-            return jsonify({'success': False, 'error': '密码至少6位'}), 400
-        
-        # 检查手机号是否已注册
+        # 4. 检查手机号唯一性
         existing_user = User.query.filter_by(phone=phone).first()
         if existing_user:
-            return jsonify({'success': False, 'error': '该手机号已注册'}), 400
+            app.logger.warning(f"重复注册尝试: {phone} from {ip_address}")
+            return jsonify({
+                'success': False,
+                'error': '该手机号已被注册，请直接登录或使用找回密码功能',
+                'code': 'PHONE_ALREADY_EXISTS'
+            }), 409
         
-        # 创建新用户
+        # 5. 创建用户账户
         user = User(
             phone=phone,
             nickname=nickname or f"用户{phone[-4:]}",
-            password_hash='temp'  # 临时值，下面会设置正确的密码
+            password_hash='temp'  # 临时值，下面会设置正确密码
         )
-        user.set_password(password)
+        user.set_password(password)  # 使用安全密码哈希
         
         db.session.add(user)
+        db.session.flush()  # 获取ID但不提交
+        
+        # 6. 生成认证令牌
+        token_manager = TokenManager(app.config['SECRET_KEY'])
+        tokens = token_manager.generate_token_pair(user)
+        
         db.session.commit()
         
-        # 生成token
-        token = generate_token(user.id)
-        
-        app.logger.info(f'✅ 新用户注册成功: {user.phone}')
+        app.logger.info(f"用户注册成功: {phone} from {ip_address}")
         
         return jsonify({
             'success': True,
             'data': {
-                'token': token,
-                **user.to_dict()
-            }
-        })
+                **tokens,
+                'user': {
+                    'id': user.id,
+                    'phone': user.phone,
+                    'nickname': user.nickname,
+                    'avatar': user.avatar,
+                    'created_at': user.created_at.isoformat()
+                }
+            },
+            'message': '注册成功！'
+        }), 201
+        
+    except IntegrityError:
+        db.session.rollback()
+        app.logger.error(f"数据库约束冲突: 重复手机号 {phone}")
+        return jsonify({
+            'success': False,
+            'error': '该手机号已被注册',
+            'code': 'DATABASE_CONSTRAINT_ERROR'
+        }), 409
         
     except Exception as e:
         db.session.rollback()
-        app.logger.error(f'注册失败: {str(e)}')
-        return jsonify({'success': False, 'error': '注册失败，请稍后重试'}), 500
+        app.logger.error(f"注册异常: {str(e)}")
+        return jsonify({
+            'success': False,
+            'error': '注册失败，请稍后重试',
+            'code': 'INTERNAL_SERVER_ERROR'
+        }), 500
 
-# 手机号密码登录
+# 手机号密码登录 - 增强版
 @app.route('/api/auth/login', methods=['POST'])
+# @limiter.limit("10 per minute")
 def login_with_phone():
-    """手机号密码登录"""
+    """手机号密码登录 - 增强版"""
     try:
         data = request.get_json()
         phone = data.get('phone', '').strip()
         password = data.get('password', '').strip()
+        ip_address = request.environ.get('HTTP_X_REAL_IP', request.remote_addr)
+        user_agent = request.headers.get('User-Agent', '')
         
-        # 验证输入数据
-        if not phone:
-            return jsonify({'success': False, 'error': '手机号不能为空'}), 400
-        
-        if not password:
-            return jsonify({'success': False, 'error': '密码不能为空'}), 400
+        # 基础验证
+        if not phone or not password:
+            return jsonify({
+                'success': False, 
+                'error': '手机号和密码不能为空'
+            }), 400
         
         # 查找用户
-        user = User.query.filter_by(phone=phone, is_active=True).first()
-        if not user:
-            return jsonify({'success': False, 'error': '用户不存在或已禁用'}), 400
+        user = User.query.filter_by(phone=phone).first()
         
-        # 验证密码
-        if not user.check_password(password):
-            return jsonify({'success': False, 'error': '密码错误'}), 400
+        if not user or not user.check_password(password):
+            app.logger.warning(f"登录失败: {phone} from {ip_address}")
+            return jsonify({
+                'success': False,
+                'error': '手机号或密码错误'
+            }), 401
+            
+        if not user.is_active:
+            app.logger.warning(f"登录失败 - 账户已停用: {phone} from {ip_address}")
+            return jsonify({
+                'success': False,
+                'error': '账户已被停用，请联系客服'
+            }), 403
         
-        # 更新最后登录时间
+        # 更新用户登录信息
         user.last_login_at = datetime.utcnow()
-        db.session.commit()
+        user.login_count = (user.login_count or 0) + 1
+        user.last_ip = ip_address
+        user.last_user_agent = user_agent
         
         # 生成token
-        token = generate_token(user.id)
+        token_manager = TokenManager(app.config['SECRET_KEY'])
+        tokens = token_manager.generate_token_pair(user)
         
-        app.logger.info(f'✅ 用户登录成功: {user.phone}')
+        db.session.commit()
+        
+        app.logger.info(f"用户登录成功: {phone} from {ip_address}")
         
         return jsonify({
             'success': True,
             'data': {
-                'token': token,
-                **user.to_dict()
+                **tokens,
+                'user': {
+                    'id': user.id,
+                    'phone': user.phone,
+                    'nickname': user.nickname,
+                    'avatar': user.avatar,
+                    'created_at': user.created_at.isoformat()
+                }
             }
         })
         
     except Exception as e:
-        app.logger.error(f'登录失败: {str(e)}')
-        return jsonify({'success': False, 'error': '登录失败，请稍后重试'}), 500
+        app.logger.error(f"登录异常: {str(e)}")
+        return jsonify({
+            'success': False,
+            'error': '登录失败，请重试'
+        }), 500
 
 @app.route('/api/auth/verify', methods=['GET'])
-@require_auth
+@token_required
 def verify_auth():
     """验证用户认证状态"""
     try:
-        user = request.current_user
+        current_user = g.current_user
         return jsonify({
             'success': True,
-            'data': user.to_dict()
+            'data': {
+                'user_id': current_user.id,
+                'phone': current_user.phone,
+                'nickname': current_user.nickname,
+                'avatar': current_user.avatar
+            }
         })
     except Exception as e:
         app.logger.error(f'验证认证状态失败: {str(e)}')
         return jsonify({'success': False, 'error': str(e)}), 500
 
+@app.route('/api/auth/refresh', methods=['POST'])
+# @limiter.limit("5 per minute")
+def refresh_token():
+    """刷新访问令牌"""
+    try:
+        data = request.get_json() or {}
+        refresh_token_value = data.get('refresh_token')
+        
+        if not refresh_token_value:
+            return jsonify({
+                'success': False,
+                'error': '缺少刷新令牌',
+                'code': 'MISSING_REFRESH_TOKEN'
+            }), 400
+        
+        # 验证刷新令牌
+        token_manager = TokenManager(app.config['SECRET_KEY'])
+        try:
+            payload = token_manager.verify_token(refresh_token_value, 'refresh')
+            user_id = payload.get('user_id')
+        except Exception as e:
+            return jsonify({
+                'success': False,
+                'error': '刷新令牌无效或已过期',
+                'code': 'INVALID_REFRESH_TOKEN'
+            }), 401
+        
+        # 查询用户
+        user = User.query.filter_by(
+            id=user_id, 
+            is_active=True,
+            deleted_at=None
+        ).first()
+        
+        if not user:
+            return jsonify({
+                'success': False,
+                'error': '用户不存在或已禁用',
+                'code': 'USER_NOT_FOUND'
+            }), 401
+        
+        # 生成新的令牌对
+        tokens = token_manager.generate_token_pair(user)
+        
+        app.logger.info(f'🔄 令牌刷新成功: {user.phone}')
+        
+        return jsonify({
+            'success': True,
+            'data': tokens
+        })
+        
+    except Exception as e:
+        app.logger.error(f'刷新令牌失败: {str(e)}')
+        return jsonify({
+            'success': False,
+            'error': '刷新令牌失败',
+            'code': 'REFRESH_ERROR'
+        }), 500
+
 @app.route('/api/auth/logout', methods=['POST'])
-@require_auth
+@token_required
 def logout():
     """用户登出"""
     try:
-        user = request.current_user
-        app.logger.info(f'👋 用户登出: {user.phone}')
+        current_user = g.current_user
+        app.logger.info(f'👋 用户登出: {current_user.phone}')
         
         return jsonify({
             'success': True,

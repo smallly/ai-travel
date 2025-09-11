@@ -89,26 +89,15 @@ const LoginModal: React.FC<LoginModalProps> = ({
       }
 
       if (response.success && response.data) {
-        // 存储token
-        localStorage.setItem('auth_token', response.data.token);
-        
-        const userData = {
-          id: response.data.user_id,
-          phone: response.data.phone,
-          nickname: response.data.nickname,
-          avatar: response.data.avatar || '',
-          createdAt: response.data.created_at || new Date().toISOString(),
-          isLoggedIn: true
-        };
-        
-        login(userData);
+        // 调用UserContext的login方法，它会处理新的token格式
+        login(response.data);
         setAuthStep('success');
         
         setTimeout(() => {
           onAuthSuccess();
           onClose();
           resetForm();
-        }, 2000);
+        }, 1000);
       } else {
         throw new Error(response.error || `${mode === 'login' ? '登录' : '注册'}失败`);
       }

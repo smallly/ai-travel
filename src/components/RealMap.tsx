@@ -14,6 +14,7 @@ interface Location {
   id: string;
   name: string;
   address: string;
+  dayNumber?: number; // 新增：标记属于第几天
   realCoordinates?: {
     lat: number;
     lng: number;
@@ -306,6 +307,9 @@ const RealMap: React.FC<RealMapProps> = ({ locations, className, onLocationClick
     const bounds = new window.AMap.Bounds();
     let validLocationCount = 0;
 
+    // 按天数分组计算每天的序号
+    const dayCounters: { [key: number]: number } = {};
+
     locations.forEach((location) => {
       if (!location.realCoordinates) return;
       
@@ -313,17 +317,33 @@ const RealMap: React.FC<RealMapProps> = ({ locations, className, onLocationClick
       const { lat, lng } = location.realCoordinates;
       console.log('📍 添加标记:', location.name, `经度:${lng}, 纬度:${lat}`);
       
+      // 根据天数决定颜色
+      const dayColors = {
+        1: { bg: 'bg-blue-500', text: 'text-blue-600', label: 'DAY 1' },
+        2: { bg: 'bg-green-500', text: 'text-green-600', label: 'DAY 2' },
+        3: { bg: 'bg-purple-500', text: 'text-purple-600', label: 'DAY 3' },
+        4: { bg: 'bg-orange-500', text: 'text-orange-600', label: 'DAY 4' },
+        5: { bg: 'bg-red-500', text: 'text-red-600', label: 'DAY 5' }
+      };
+      
+      const dayNumber = location.dayNumber || 1;
+      const colorInfo = dayColors[dayNumber as keyof typeof dayColors] || dayColors[1];
+      
+      // 计算该天的序号
+      if (!dayCounters[dayNumber]) {
+        dayCounters[dayNumber] = 0;
+      }
+      dayCounters[dayNumber]++;
+      const dayIndex = dayCounters[dayNumber];
+      
       // 创建自定义标记内容
       const markerContent = document.createElement('div');
       markerContent.className = 'relative flex flex-col items-center';
       markerContent.innerHTML = `
-        <div class="w-8 h-8 bg-purple-500 rounded-full flex items-center justify-center shadow-lg animate-bounce cursor-pointer">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path>
-            <circle cx="12" cy="10" r="3"></circle>
-          </svg>
+        <div class="w-6 h-6 ${colorInfo.bg} rounded-full flex items-center justify-center shadow-lg cursor-pointer border-2 border-white">
+          <span class="text-white text-xs font-bold">${dayIndex}</span>
         </div>
-        <div class="absolute -bottom-8 left-1/2 transform -translate-x-1/2 bg-white px-2 py-1 rounded shadow-md text-xs whitespace-nowrap border border-gray-200 font-medium text-gray-700">
+        <div class="absolute -bottom-7 left-1/2 transform -translate-x-1/2 bg-white px-2 py-1 rounded shadow-md text-xs whitespace-nowrap border border-gray-200 font-medium text-gray-700">
           ${location.name}
         </div>
       `;
