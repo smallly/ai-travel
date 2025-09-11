@@ -1,5 +1,6 @@
-import React from 'react';
-import { ArrowLeft, MapPin, Calendar, Clock, Map, Navigation } from 'lucide-react';
+import React, { useState } from 'react';
+import { ArrowLeft, MapPin, Calendar, Clock, Map, Navigation, Maximize, Minimize } from 'lucide-react';
+import RealMap from './RealMap';
 
 interface TravelPlan {
   id: string;
@@ -41,6 +42,7 @@ const TripDetailPage: React.FC<TripDetailPageProps> = ({
   onBack, 
   onNavigate 
 }) => {
+  const [isMapFullscreen, setIsMapFullscreen] = useState(false);
   const getStatusIcon = (status: string) => {
     switch (status) {
       case 'planning':
@@ -81,7 +83,7 @@ const TripDetailPage: React.FC<TripDetailPageProps> = ({
   };
 
   return (
-    <div className="min-h-screen bg-white flex flex-col max-w-md mx-auto">
+    <div className="h-screen bg-white flex flex-col max-w-md mx-auto overflow-hidden">
       {/* 头部 */}
       <div className="bg-white border-b border-gray-100 px-4 py-4 flex items-center justify-between sticky top-0 z-10">
         <button
@@ -95,7 +97,7 @@ const TripDetailPage: React.FC<TripDetailPageProps> = ({
       </div>
 
       {/* 内容区域 */}
-      <div className="flex-1 overflow-y-auto">
+      <div className="flex-1 overflow-y-auto custom-scrollbar">
         {/* 行程头部信息 */}
         <div className="p-4">
           <div className="flex items-start gap-4 mb-4">
@@ -113,21 +115,17 @@ const TripDetailPage: React.FC<TripDetailPageProps> = ({
                 </span>
               </div>
               <div className="text-sm text-gray-600 space-y-1">
-                <div className="flex items-center gap-2">
-                  <Clock className="w-4 h-4" />
-                  <span>{trip.duration}</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <MapPin className="w-4 h-4" />
-                  <span>{trip.locations} 个地点</span>
-                </div>
-                {trip.startDate && trip.endDate && (
+                <div className="flex items-center gap-4">
                   <div className="flex items-center gap-2">
-                    <Calendar className="w-4 h-4" />
-                    <span>{trip.startDate} - {trip.endDate}</span>
+                    <Clock className="w-4 h-4" />
+                    <span>{trip.duration}</span>
                   </div>
-                )}
-                {trip.createdAt && !trip.startDate && (
+                  <div className="flex items-center gap-2">
+                    <MapPin className="w-4 h-4" />
+                    <span>{trip.locations} 个地点</span>
+                  </div>
+                </div>
+                {trip.createdAt && (
                   <div className="flex items-center gap-2">
                     <Calendar className="w-4 h-4" />
                     <span>创建于 {trip.createdAt}</span>
@@ -137,20 +135,80 @@ const TripDetailPage: React.FC<TripDetailPageProps> = ({
             </div>
           </div>
 
-          {/* 查看地图按钮 */}
+          {/* 天数快速定位标签 */}
           <div className="mb-6">
-            <button
-              onClick={() => onNavigate(trip.destination || trip.title, trip.centerCoordinates)}
-              className="w-full bg-gradient-to-r from-purple-500 to-blue-500 text-white py-3 rounded-2xl flex items-center justify-center gap-2 font-medium shadow-lg hover:shadow-xl transition-all"
-            >
-              <Map className="w-5 h-5" />
-              查看完整地图
-            </button>
+            <div className="flex bg-gray-100 rounded-xl p-1">
+              {(() => {
+                const days = Math.ceil((trip.duration?.includes('天') ? parseInt(trip.duration) : 1));
+                return Array.from({ length: days }, (_, index) => {
+                  const dayNumber = index + 1;
+                  return (
+                    <button
+                      key={dayNumber}
+                      onClick={() => {
+                        // 快速定位到对应的Day
+                        const dayElement = document.getElementById(`day-${dayNumber}`);
+                        if (dayElement) {
+                          dayElement.scrollIntoView({ 
+                            behavior: 'smooth', 
+                            block: 'start' 
+                          });
+                        }
+                      }}
+                      className="flex-1 py-2 px-4 rounded-lg text-sm font-medium transition-all text-gray-600 hover:text-gray-800 hover:bg-white hover:shadow-sm"
+                    >
+                      DAY {dayNumber}
+                    </button>
+                  );
+                });
+              })()}
+            </div>
+          </div>
+
+          {/* 地图区域 */}
+          <div className={`relative ${isMapFullscreen ? 'fixed inset-0 z-50' : 'h-64'} overflow-hidden transition-all duration-300 rounded-2xl mb-6`}>
+            {/* 地图组件 */}
+            <RealMap 
+              locations={
+                (trip.attractionList || []).map(attraction => ({
+                  id: attraction.id,
+                  name: attraction.name,
+                  address: attraction.address,
+                  realCoordinates: attraction.coordinates
+                }))
+              }
+              className="absolute inset-0 w-full h-full"
+              onLocationClick={(location) => {
+                console.log('点击了地点:', location.name);
+              }}
+            />
+            
+            {/* 地图控制按钮 */}
+            <div className="absolute top-4 right-4 flex flex-col gap-2 z-10">
+              <button 
+                onClick={() => setIsMapFullscreen(!isMapFullscreen)}
+                className="w-10 h-10 bg-white rounded-full shadow-md flex items-center justify-center hover:bg-gray-50 transition-colors"
+              >
+                {isMapFullscreen ? <Minimize className="w-5 h-5 text-gray-600" /> : <Maximize className="w-5 h-5 text-gray-600" />}
+              </button>
+            </div>
+            
+            {/* 全屏状态下的返回按钮 */}
+            {isMapFullscreen && (
+              <div className="absolute top-4 left-4 z-10">
+                <button 
+                  onClick={() => setIsMapFullscreen(false)}
+                  className="w-10 h-10 bg-white rounded-full shadow-md flex items-center justify-center hover:bg-gray-50 transition-colors"
+                >
+                  <ArrowLeft className="w-5 h-5 text-gray-600" />
+                </button>
+              </div>
+            )}
           </div>
         </div>
 
         {/* 地点清单 */}
-        <div className="px-4 pb-6">
+        <div className="px-4 pb-6 flex-1">
           <div className="flex items-center gap-2 mb-4">
             <MapPin className="w-5 h-5 text-purple-500" />
             <h4 className="text-lg font-semibold text-gray-800">地点清单</h4>
@@ -160,50 +218,80 @@ const TripDetailPage: React.FC<TripDetailPageProps> = ({
           </div>
 
           {trip.attractionList && trip.attractionList.length > 0 ? (
-            <div className="space-y-3">
-              {trip.attractionList.map((attraction, index) => (
-                <div key={attraction.id} className="bg-gray-50 rounded-2xl p-4">
-                  <div className="flex items-start gap-3">
-                    {/* 序号 */}
-                    <div className="w-8 h-8 bg-purple-500 text-white rounded-full flex items-center justify-center text-sm font-medium flex-shrink-0">
-                      {index + 1}
-                    </div>
-                    
-                    {/* 地点图片 */}
-                    <img
-                      src={attraction.image}
-                      alt={attraction.name}
-                      className="w-16 h-16 rounded-xl object-cover flex-shrink-0"
-                    />
-                    
-                    {/* 地点信息 */}
-                    <div className="flex-1 min-w-0">
-                      <h5 className="font-semibold text-gray-800 mb-1 truncate">
-                        {attraction.name}
-                      </h5>
-                      <p className="text-sm text-gray-600 mb-2 line-clamp-2">
-                        {attraction.address}
-                      </p>
-                      {attraction.description && (
-                        <p className="text-xs text-gray-500 line-clamp-2 mb-3">
-                          {attraction.description}
-                        </p>
-                      )}
+            <div>
+              {/* 显示所有天数的景点 */}
+              {(() => {
+                // 计算每天的景点分配
+                const days = Math.ceil((trip.duration?.includes('天') ? parseInt(trip.duration) : 1));
+                const attractionsPerDay = Math.ceil(trip.attractionList.length / days);
+
+                return Array.from({ length: days }, (_, dayIndex) => {
+                  const dayNumber = dayIndex + 1;
+                  const startIndex = dayIndex * attractionsPerDay;
+                  const endIndex = startIndex + attractionsPerDay;
+                  const dayAttractions = trip.attractionList.slice(startIndex, endIndex);
+
+                  return (
+                    <div key={dayNumber} id={`day-${dayNumber}`} className="mb-6">
+                      {/* Day标题 */}
+                      <div className="flex items-center gap-2 mb-3">
+                        <div className="w-6 h-6 bg-purple-500 text-white rounded-full flex items-center justify-center text-sm font-medium">
+                          {dayNumber}
+                        </div>
+                        <h5 className="font-semibold text-gray-800">Day {dayNumber}</h5>
+                        <div className="flex-1 h-px bg-gray-200"></div>
+                      </div>
                       
-                      {/* 导航按钮 */}
-                      <div className="flex gap-2">
-                        <button
-                          onClick={() => onNavigate(attraction.address, attraction.coordinates)}
-                          className="bg-white text-green-600 px-3 py-1.5 rounded-lg text-xs font-medium border border-green-200 hover:bg-green-50 transition-colors flex items-center gap-1"
-                        >
-                          <Navigation className="w-3 h-3" />
-                          导航
-                        </button>
+                      {/* 该天的景点列表 */}
+                      <div className="space-y-3 pl-8">
+                        {dayAttractions.map((attraction, index) => (
+                          <div key={attraction.id} className="bg-gray-50 rounded-2xl p-4">
+                            <div className="flex items-start gap-3">
+                              {/* 时间序号 */}
+                              <div className="w-6 h-6 bg-blue-500 text-white rounded-full flex items-center justify-center text-xs font-medium flex-shrink-0">
+                                {index + 1}
+                              </div>
+                              
+                              {/* 地点图片 */}
+                              <img
+                                src={attraction.image}
+                                alt={attraction.name}
+                                className="w-16 h-16 rounded-xl object-cover flex-shrink-0"
+                              />
+                              
+                              {/* 地点信息 */}
+                              <div className="flex-1 min-w-0">
+                                <h6 className="font-semibold text-gray-800 mb-1 truncate">
+                                  {attraction.name}
+                                </h6>
+                                <p className="text-sm text-gray-600 mb-2 line-clamp-2">
+                                  {attraction.address}
+                                </p>
+                                {attraction.description && (
+                                  <p className="text-xs text-gray-500 line-clamp-2 mb-3">
+                                    {attraction.description}
+                                  </p>
+                                )}
+                                
+                                {/* 导航按钮 */}
+                                <div className="flex gap-2">
+                                  <button
+                                    onClick={() => onNavigate(attraction.address, attraction.coordinates)}
+                                    className="bg-white text-green-600 px-3 py-1.5 rounded-lg text-xs font-medium border border-green-200 hover:bg-green-50 transition-colors flex items-center gap-1"
+                                  >
+                                    <Navigation className="w-3 h-3" />
+                                    导航
+                                  </button>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
                       </div>
                     </div>
-                  </div>
-                </div>
-              ))}
+                  );
+                });
+              })()}
             </div>
           ) : (
             <div className="text-center py-8">

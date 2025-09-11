@@ -82,7 +82,7 @@ interface TravelPlan {
   endDate?: string;
 }
 
-type Screen = 'login' | 'register' | 'main' | 'editProfile' | 'tripDetail';
+type Screen = 'login' | 'register' | 'main' | 'editProfile' | 'tripDetail' | 'locationDetail';
 type Tab = 'chat' | 'itinerary' | 'profile';
 
 // 最简单的FormInput，暂时不用ref，只测试不失焦功能
@@ -178,7 +178,7 @@ function AppContent() {
   const { user, isLoading, isAuthenticated } = useUser();
   const [currentScreen, setCurrentScreen] = useState<Screen>('login');
   const [currentTab, setCurrentTab] = useState<Tab>('chat');
-  const [currentItineraryTab, setCurrentItineraryTab] = useState<'pending' | 'planning' | 'completed'>('pending');
+  const [currentItineraryTab, setCurrentItineraryTab] = useState<'pending' | 'planning' | 'completed'>('planning');
   const [showPassword, setShowPassword] = useState(false);
   const [isMapFullscreen, setIsMapFullscreen] = useState(false);
   // const [loginForm, setLoginForm] = useState({ email: '', password: '' });
@@ -200,6 +200,7 @@ function AppContent() {
   const [showAbout, setShowAbout] = useState(false);
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
   const [selectedTrip, setSelectedTrip] = useState<TravelPlan | null>(null);
+  const [selectedLocation, setSelectedLocation] = useState<Location | null>(null);
   const [toast, setToast] = useState<{ message: string; visible: boolean }>({ 
     message: '', 
     visible: false 
@@ -376,7 +377,7 @@ function AppContent() {
       duration: '3天2晚',
       locations: 8,
       image: 'https://images.pexels.com/photos/2901209/pexels-photo-2901209.jpeg?auto=compress&cs=tinysrgb&w=400',
-      status: 'upcoming',
+      status: 'planning',
       province: '山东省',
       centerCoordinates: { lat: 36.0661, lng: 120.3694 },
       destination: '青岛市',
@@ -416,7 +417,7 @@ function AppContent() {
       duration: '2天1晚',
       locations: 5,
       image: 'https://images.pexels.com/photos/1591373/pexels-photo-1591373.jpeg?auto=compress&cs=tinysrgb&w=400',
-      status: 'completed',
+      status: 'planning',
       centerCoordinates: { lat: 39.9163, lng: 116.3972 },
       destination: '北京故宫',
       startDate: '2024-02-10',
@@ -1282,18 +1283,8 @@ function AppContent() {
           <h2 className="font-semibold text-gray-800 text-lg">行程</h2>
         </div>
         
-        {/* Tab切换 */}
-        <div className="flex bg-purple-50 rounded-xl p-1">
-          <button
-            onClick={() => setCurrentItineraryTab('pending')}
-            className={`flex-1 py-2 px-4 rounded-lg text-sm font-medium transition-all ${
-              currentItineraryTab === 'pending' 
-                ? 'bg-white text-purple-600 shadow-sm' 
-                : 'text-gray-600'
-            }`}
-          >
-            待出行
-          </button>
+        {/* Tab切换 - 已简化为单一标题 */}
+        {/* <div className="flex bg-purple-50 rounded-xl p-1">
           <button
             onClick={() => setCurrentItineraryTab('planning')}
             className={`flex-1 py-2 px-4 rounded-lg text-sm font-medium transition-all ${
@@ -1304,129 +1295,53 @@ function AppContent() {
           >
             规划中
           </button>
-          <button
-            onClick={() => setCurrentItineraryTab('completed')}
-            className={`flex-1 py-2 px-4 rounded-lg text-sm font-medium transition-all ${
-              currentItineraryTab === 'completed' 
-                ? 'bg-white text-purple-600 shadow-sm' 
-                : 'text-gray-600'
-            }`}
-          >
-            已出行
-          </button>
-        </div>
+        </div> */}
       </div>
 
-      {/* 待出行页面 */}
-      {currentItineraryTab === 'pending' && (
-        <>
-          {/* 地图区域 */}
-          <div className={`relative ${isMapFullscreen ? 'fixed inset-0 z-50' : 'h-64'} overflow-hidden transition-all duration-300`}>
-            {/* 真实地图组件 */}
-            <RealMap 
-              locations={myLocations}
-              className="absolute inset-0 w-full h-full"
-              onLocationClick={(location) => {
-                // 点击地点标记时的处理
-                console.log('点击了地点:', location.name);
-              }}
-            />
-            
-            {/* 地图控制按钮 */}
-            <div className="absolute top-4 right-4 flex flex-col gap-2 z-10">
-              <button 
-                onClick={() => setIsMapFullscreen(!isMapFullscreen)}
-                className="w-10 h-10 bg-white rounded-full shadow-md flex items-center justify-center hover:bg-gray-50 transition-colors"
-              >
-                {isMapFullscreen ? <Minimize className="w-5 h-5 text-gray-600" /> : <Maximize className="w-5 h-5 text-gray-600" />}
-              </button>
-            </div>
-            
-            {/* 全屏状态下的返回按钮 */}
-            {isMapFullscreen && (
-              <div className="absolute top-4 left-4 z-10">
-                <button 
-                  onClick={() => setIsMapFullscreen(false)}
-                  className="w-10 h-10 bg-white rounded-full shadow-md flex items-center justify-center hover:bg-gray-50 transition-colors"
+      {/* 待出行页面 - 已注释 */}
+      {/* {currentItineraryTab === 'pending' && (
+        <div className="flex-1 p-4 overflow-y-auto custom-scrollbar">
+          <div className="space-y-3">
+            {myLocations
+              .sort((a, b) => b.savedTime - a.savedTime) // 按保存时间倒序排列
+              .map((location) => (
+                <div 
+                  key={location.id} 
+                  className="bg-gray-50 rounded-2xl p-4 shadow-sm cursor-pointer hover:bg-gray-100 transition-colors"
+                  onClick={() => {
+                    setSelectedLocation(location);
+                    setCurrentScreen('locationDetail');
+                  }}
                 >
-                  <ArrowLeft className="w-5 h-5 text-gray-600" />
-                </button>
-              </div>
-            )}
-
-            {/* 查看地图按钮 */}
-            <div className="absolute bottom-4 left-4 z-10">
-              <button 
-                onClick={() => {
-                  // 如果有地点，导航到第一个地点或所有地点的中心
-                  if (myLocations.length > 0) {
-                    const firstLocation = myLocations[0];
-                    navigateToLocation(firstLocation.address, firstLocation.realCoordinates);
-                  } else {
-                    // 没有地点时，全屏显示地图
-                    setIsMapFullscreen(true);
-                  }
-                }}
-                className="bg-white text-purple-600 px-4 py-2 rounded-full flex items-center gap-2 text-sm font-medium shadow-md border border-purple-200 hover:bg-purple-50 transition-colors"
-                title={myLocations.length > 0 ? "导航到地点" : "查看地图"}
-              >
-                <Map className="w-4 h-4" />
-                {myLocations.length > 0 ? "导航" : "查看地图"}
-              </button>
-            </div>
-          </div>
-          {/* 地点列表 */}
-          {!isMapFullscreen && (
-            <div className="flex-1 bg-white rounded-t-3xl -mt-4 p-4 relative z-10 overflow-y-auto custom-scrollbar">
-              <div className="flex items-center gap-2 mb-4">
-                <MapPin className="w-5 h-5 text-purple-500" />
-                <h3 className="font-semibold text-gray-800 text-lg">我的旅行地点</h3>
-                <div className="ml-auto text-sm text-gray-500">{myLocations.length}个地点</div>
-              </div>
-
-              <div className="space-y-3">
-                {myLocations
-                  .sort((a, b) => b.savedTime - a.savedTime) // 按保存时间倒序排列
-                  .map((location) => (
-                  <div key={location.id} className="bg-gray-50 rounded-2xl p-4">
-                    <div className="flex items-center gap-3 mb-3">
-                      <img
-                        src="https://images.pexels.com/photos/1591373/pexels-photo-1591373.jpeg?auto=compress&cs=tinysrgb&w=400"
-                        alt={location.name}
-                        className="w-12 h-12 rounded-xl object-cover"
-                      />
-                      <div className="flex-1">
-                        <h4 className="font-medium text-gray-800 mb-1">{location.name}</h4>
-                        <p className="text-sm text-gray-500 mb-1">{location.address}</p>
-                        <p className="text-xs text-gray-400">保存于 {location.savedDate}</p>
-                      </div>
-                      <div className="flex gap-2">
-                        <button 
-                          onClick={() => navigateToLocation(location.address, location.realCoordinates)}
-                          className="text-green-500 p-2 hover:bg-green-50 rounded-full transition-colors"
-                          title="导航到此地点"
-                        >
-                          <Send className="w-4 h-4" />
-                        </button>
-                        <button 
-                          onClick={() => showDeleteConfirm(location.id, location.name)}
-                          className="text-red-500 p-2 hover:bg-red-50 rounded-full transition-colors"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      </div>
+                  <div className="flex items-center gap-3">
+                    <img
+                      src="https://images.pexels.com/photos/1591373/pexels-photo-1591373.jpeg?auto=compress&cs=tinysrgb&w=400"
+                      alt={location.name}
+                      className="w-12 h-12 rounded-xl object-cover"
+                    />
+                    <div className="flex-1">
+                      <h4 className="font-medium text-gray-800">{location.name}</h4>
+                      <p className="text-sm text-gray-500">{location.address}</p>
+                      <p className="text-xs text-gray-400 mt-1">保存于 {location.savedDate}</p>
                     </div>
                   </div>
-                ))}
+                </div>
+              ))}
+            
+            {myLocations.length === 0 && (
+              <div className="text-center py-12">
+                <div className="w-16 h-16 bg-gray-50 rounded-full flex items-center justify-center mx-auto mb-4 shadow-sm">
+                  <MapPin className="w-8 h-8 text-gray-400" />
+                </div>
+                <p className="text-gray-500">暂无待出行的地点</p>
               </div>
-            </div>
-          )}
-        </>
-      )}
+            )}
+          </div>
+        </div>
+      )} */}
 
-      {/* 规划中页面 */}
-      {currentItineraryTab === 'planning' && (
-        <div className="flex-1 p-4 overflow-y-auto custom-scrollbar">
+      {/* 规划中页面 - 直接显示，不需要条件判断 */}
+      <div className="flex-1 p-4 overflow-y-auto custom-scrollbar">
           <div className="space-y-3">
             {travelPlans
               .filter(plan => plan.status === 'planning')
@@ -1461,10 +1376,9 @@ function AppContent() {
             )}
           </div>
         </div>
-      )}
 
-      {/* 已出行页面 */}
-      {currentItineraryTab === 'completed' && (
+      {/* 已出行页面 - 已注释 */}
+      {/* {currentItineraryTab === 'completed' && (
         <div className="flex-1 p-4 overflow-y-auto custom-scrollbar">
           <div className="space-y-3">
             {travelPlans
@@ -1491,7 +1405,7 @@ function AppContent() {
               ))}
           </div>
         </div>
-      )}
+      )} */}
     </div>
   );
 
@@ -1582,6 +1496,116 @@ function AppContent() {
       </div>
     </div>
   );
+
+  // 地点详情页面
+  const LocationDetailScreen = () => {
+    if (!selectedLocation) return null;
+
+    return (
+      <div className="h-screen flex flex-col bg-white max-w-md mx-auto">
+        {/* 头部 */}
+        <div className="bg-white border-b border-gray-100 px-4 py-4">
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => setCurrentScreen('main')}
+              className="p-2 hover:bg-gray-50 rounded-full transition-colors"
+            >
+              <ArrowLeft className="w-5 h-5 text-gray-600" />
+            </button>
+            <div className="flex-1">
+              <h2 className="font-semibold text-gray-800 text-lg">{selectedLocation.name}</h2>
+              <p className="text-sm text-gray-500">{selectedLocation.address}</p>
+            </div>
+          </div>
+        </div>
+
+        {/* 地图区域 */}
+        <div className={`relative ${isMapFullscreen ? 'fixed inset-0 z-50' : 'h-64'} overflow-hidden transition-all duration-300`}>
+          {/* 真实地图组件 */}
+          <RealMap 
+            locations={[selectedLocation]}
+            className="absolute inset-0 w-full h-full"
+            onLocationClick={(location) => {
+              console.log('点击了地点:', location.name);
+            }}
+          />
+          
+          {/* 地图控制按钮 */}
+          <div className="absolute top-4 right-4 flex flex-col gap-2 z-10">
+            <button 
+              onClick={() => setIsMapFullscreen(!isMapFullscreen)}
+              className="w-10 h-10 bg-white rounded-full shadow-md flex items-center justify-center hover:bg-gray-50 transition-colors"
+            >
+              {isMapFullscreen ? <Minimize className="w-5 h-5 text-gray-600" /> : <Maximize className="w-5 h-5 text-gray-600" />}
+            </button>
+          </div>
+          
+          {/* 全屏状态下的返回按钮 */}
+          {isMapFullscreen && (
+            <div className="absolute top-4 left-4 z-10">
+              <button 
+                onClick={() => setIsMapFullscreen(false)}
+                className="w-10 h-10 bg-white rounded-full shadow-md flex items-center justify-center hover:bg-gray-50 transition-colors"
+              >
+                <ArrowLeft className="w-5 h-5 text-gray-600" />
+              </button>
+            </div>
+          )}
+
+          {/* 导航按钮 */}
+          <div className="absolute bottom-4 left-4 z-10">
+            <button 
+              onClick={() => navigateToLocation(selectedLocation.address, selectedLocation.realCoordinates)}
+              className="bg-white text-purple-600 px-4 py-2 rounded-full flex items-center gap-2 text-sm font-medium shadow-md border border-purple-200 hover:bg-purple-50 transition-colors"
+            >
+              <Send className="w-4 h-4" />
+              导航到此地点
+            </button>
+          </div>
+        </div>
+
+        {/* 地点详情信息 */}
+        {!isMapFullscreen && (
+          <div className="flex-1 bg-white rounded-t-3xl -mt-4 p-4 relative z-10 overflow-y-auto custom-scrollbar">
+            <div className="space-y-4">
+              {/* 基本信息 */}
+              <div className="bg-gray-50 rounded-2xl p-4">
+                <div className="flex items-center gap-3 mb-3">
+                  <img
+                    src="https://images.pexels.com/photos/1591373/pexels-photo-1591373.jpeg?auto=compress&cs=tinysrgb&w=400"
+                    alt={selectedLocation.name}
+                    className="w-16 h-16 rounded-xl object-cover"
+                  />
+                  <div className="flex-1">
+                    <h4 className="font-medium text-gray-800 text-lg mb-1">{selectedLocation.name}</h4>
+                    <p className="text-sm text-gray-500 mb-2">{selectedLocation.address}</p>
+                    <p className="text-xs text-gray-400">保存于 {selectedLocation.savedDate}</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* 操作按钮 */}
+              <div className="flex gap-3">
+                <button 
+                  onClick={() => navigateToLocation(selectedLocation.address, selectedLocation.realCoordinates)}
+                  className="flex-1 bg-gradient-to-r from-purple-500 to-blue-500 text-white py-3 rounded-xl flex items-center justify-center gap-2 font-medium shadow-lg hover:shadow-xl transition-all duration-300 active:scale-95"
+                >
+                  <Send className="w-4 h-4" />
+                  导航到此地点
+                </button>
+                <button 
+                  onClick={() => showDeleteConfirm(selectedLocation.id, selectedLocation.name)}
+                  className="px-4 bg-red-50 text-red-500 rounded-xl hover:bg-red-100 transition-colors flex items-center justify-center"
+                >
+                  <Trash2 className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  };
 
   // 主应用界面
   const MainScreen = () => (
@@ -1731,6 +1755,11 @@ function AppContent() {
           onBack={handleCloseTripDetail}
           onNavigate={navigateToLocation}
         />
+      )}
+
+      {/* 地点详情页面 */}
+      {currentScreen === 'locationDetail' && selectedLocation && (
+        <LocationDetailScreen />
       )}
     </div>
   );

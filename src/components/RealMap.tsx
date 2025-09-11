@@ -477,14 +477,15 @@ const RealMap: React.FC<RealMapProps> = ({ locations, className, onLocationClick
       )}
       
       {/* 地图信息标签 */}
-      {!isLoading && !error && locations.length > 0 && (
+      {/* 地点数量标签已移除 */}
+      {/* {!isLoading && !error && locations.length > 0 && (
         <div className="absolute bottom-4 left-4 bg-white rounded-lg shadow-md px-3 py-2 border border-gray-200 z-10">
           <div className="flex items-center gap-2 text-sm">
             <div className="w-2 h-2 bg-purple-500 rounded-full"></div>
             <span className="text-gray-700 font-medium">共 {locations.length} 个地点</span>
           </div>
         </div>
-      )}
+      )} */}
       
       {/* 地图版权信息 */}
       {!isLoading && !error && (
