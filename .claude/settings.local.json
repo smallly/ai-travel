@@ -12,7 +12,9 @@
       "Bash(del test_parse.js)",
       "Bash(copy:*)",
       "Bash(del test_coordinates.js)",
-      "Bash(git checkout:*)"
+      "Bash(git checkout:*)",
+      "Bash(git push:*)",
+      "Bash(git add:*)"
     ],
     "deny": [],
     "ask": []
