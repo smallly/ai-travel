@@ -124,7 +124,7 @@ class DifyConfig:
     ]
     
     MAX_ATTRACTIONS_PER_RESPONSE = 5  # 每次最多返回的景点数量
-    DEFAULT_ATTRACTION_IMAGE = 'https://images.pexels.com/photos/1591373/pexels-photo-1591373.jpeg?auto=compress&cs=tinysrgb&w=400'
+    DEFAULT_ATTRACTION_IMAGE = '/trip-cover.png'
     
     @classmethod
     def validate_config(cls):

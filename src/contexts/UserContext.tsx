@@ -16,7 +16,7 @@ interface UserContextType {
   isAuthenticated: boolean;
   login: (userData: any) => void;
   logout: () => void;
-  updateUser: (userData: Partial<User>) => void;
+  updateUser: (userData: Partial<User>) => Promise<void>;
   checkAuthStatus: () => Promise<boolean>;
   refreshToken: () => Promise<boolean>;
   isTokenValid: () => boolean;
@@ -41,7 +41,7 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
   // 检查本地存储的用户信息
   const checkLocalAuth = (): User | null => {
     try {
-      const token = localStorage.getItem('access_token');
+      const token = localStorage.getItem('auth_token');
       const userData = localStorage.getItem('user_data');
       const rememberMe = localStorage.getItem('remember_me') !== 'false'; // 默认记住登录
       
@@ -58,7 +58,7 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
 
   // 清除所有token和相关设置
   const clearTokens = useCallback(() => {
-    localStorage.removeItem('access_token');
+    localStorage.removeItem('auth_token');
     localStorage.removeItem('refresh_token');
     localStorage.removeItem('user_data');
     localStorage.removeItem('token_expires_at');
@@ -67,7 +67,7 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
 
   // Token有效性检查 - 更宽松的过期时间判断
   const isTokenValid = useCallback((): boolean => {
-    const token = localStorage.getItem('access_token');
+    const token = localStorage.getItem('auth_token');
     if (!token) return false;
     
     try {
@@ -90,7 +90,7 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
       const response = await userApi.refreshToken(refreshTokenValue);
       if (response.success && response.data) {
         // 保存新的token
-        localStorage.setItem('access_token', response.data.access_token);
+        localStorage.setItem('auth_token', response.data.access_token);
         localStorage.setItem('refresh_token', response.data.refresh_token);
         localStorage.setItem('token_expires_at', 
           (Date.now() + response.data.expires_in * 1000).toString()
@@ -106,7 +106,7 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
     }
   }, []);
 
-  // 检查认证状态 - 优化为更依赖本地存储，减少网络请求
+  // 检查认证状态 - 获取最新用户数据确保同步
   const checkAuthStatus = async (): Promise<boolean> => {
     setIsLoading(true);
     try {
@@ -117,8 +117,29 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
         return false;
       }
 
-      // 如果有本地用户数据且token仍然有效，直接使用
+      // 如果有本地用户数据且token有效，获取最新的用户资料
       if (isTokenValid()) {
+        try {
+          // 获取最新的用户资料数据，确保头像、昵称等信息是最新的
+          const profileResponse = await userApi.getProfile();
+          if (profileResponse.success && profileResponse.data) {
+            const updatedUser = {
+              ...localUser,
+              ...profileResponse.data,
+              id: profileResponse.data.user_id,
+              isLoggedIn: true
+            };
+            setUser(updatedUser);
+            localStorage.setItem('user_data', JSON.stringify(updatedUser));
+            setIsLoading(false);
+            return true;
+          }
+        } catch (error) {
+          // 如果获取用户资料失败，使用本地数据但记录错误
+          console.warn('获取用户资料失败，使用本地数据:', error);
+        }
+
+        // 回退到本地用户数据
         setUser(localUser);
         setIsLoading(false);
         return true;
@@ -127,20 +148,38 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
       // 如果token即将过期，尝试刷新
       const refreshed = await refreshToken();
       if (refreshed) {
+        // 刷新成功后，获取最新用户数据
+        try {
+          const profileResponse = await userApi.getProfile();
+          if (profileResponse.success && profileResponse.data) {
+            const updatedUser = {
+              ...localUser,
+              ...profileResponse.data,
+              id: profileResponse.data.user_id,
+              isLoggedIn: true
+            };
+            setUser(updatedUser);
+            localStorage.setItem('user_data', JSON.stringify(updatedUser));
+            setIsLoading(false);
+            return true;
+          }
+        } catch (error) {
+          console.warn('获取用户资料失败，使用本地数据:', error);
+        }
+
         setUser(localUser);
         setIsLoading(false);
         return true;
       }
 
       // 只有在token完全无效且刷新失败时才尝试验证
-      // 这样减少了不必要的网络请求
       try {
         const response = await userApi.verifyAuth();
         if (response.success && response.data) {
-          const updatedUser = { 
-            ...localUser, 
+          const updatedUser = {
+            ...localUser,
             ...response.data,
-            isLoggedIn: true 
+            isLoggedIn: true
           };
           setUser(updatedUser);
           localStorage.setItem('user_data', JSON.stringify(updatedUser));
@@ -168,7 +207,7 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
         setIsLoading(false);
         return true;
       }
-      
+
       logout();
       setIsLoading(false);
       return false;
@@ -180,7 +219,7 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
     const { user, access_token, refresh_token, expires_in } = loginData;
     
     // 保存tokens
-    localStorage.setItem('access_token', access_token);
+    localStorage.setItem('auth_token', access_token);
     localStorage.setItem('refresh_token', refresh_token);
     localStorage.setItem('token_expires_at', 
       (Date.now() + expires_in * 1000).toString()
@@ -204,11 +243,41 @@ export const UserProvider: React.FC<UserProviderProps> = ({ children }) => {
   }, [clearTokens]);
 
   // 更新用户信息
-  const updateUser = (userData: Partial<User>) => {
-    if (user) {
-      const updatedUser = { ...user, ...userData };
-      setUser(updatedUser);
-      localStorage.setItem('user_data', JSON.stringify(updatedUser));
+  const updateUser = async (userData: Partial<User>) => {
+    if (!user) return;
+
+    try {
+      // 调用API更新服务器端数据
+      const apiData: { nickname?: string; avatar?: string } = {};
+      if (userData.nickname !== undefined) apiData.nickname = userData.nickname;
+      if (userData.avatar !== undefined) apiData.avatar = userData.avatar;
+
+      const response = await userApi.updateProfile(apiData);
+
+      if (response.success && response.data) {
+        // 服务器更新成功，使用服务器返回的数据
+        const updatedUser = {
+          ...user,
+          ...response.data,
+          id: response.data.user_id,
+          isLoggedIn: true
+        };
+        setUser(updatedUser);
+        localStorage.setItem('user_data', JSON.stringify(updatedUser));
+        console.log('用户信息更新成功:', updatedUser);
+      } else {
+        console.error('更新用户信息失败:', response.error);
+        // 即使API失败，也更新本地状态（降级处理）
+        const localUpdatedUser = { ...user, ...userData };
+        setUser(localUpdatedUser);
+        localStorage.setItem('user_data', JSON.stringify(localUpdatedUser));
+      }
+    } catch (error) {
+      console.error('更新用户信息请求失败:', error);
+      // 网络错误时的降级处理
+      const localUpdatedUser = { ...user, ...userData };
+      setUser(localUpdatedUser);
+      localStorage.setItem('user_data', JSON.stringify(localUpdatedUser));
     }
   };
 

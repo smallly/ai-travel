@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { ArrowLeft, MapPin, Calendar, Clock, Map, Navigation, Maximize, Minimize } from 'lucide-react';
+import { ArrowLeft, MapPin, Calendar, Clock, Map, Navigation, Maximize, Minimize, Trash2, Star, ThumbsUp } from 'lucide-react';
 import RealMap from './RealMap';
 
 interface TravelPlan {
@@ -29,21 +29,25 @@ interface TravelPlan {
   createdAt?: string;
   startDate?: string;
   endDate?: string;
+  sourceLink?: string; // 原文链接
 }
 
 interface TripDetailPageProps {
   trip: TravelPlan;
   onBack: () => void;
   onNavigate: (address: string, coordinates?: { lat: number; lng: number }) => void;
+  onDelete?: (tripId: string) => void;
 }
 
-const TripDetailPage: React.FC<TripDetailPageProps> = ({ 
-  trip, 
-  onBack, 
-  onNavigate 
+const TripDetailPage: React.FC<TripDetailPageProps> = ({
+  trip,
+  onBack,
+  onNavigate,
+  onDelete
 }) => {
   const [isMapFullscreen, setIsMapFullscreen] = useState(false);
   const [activeDay, setActiveDay] = useState(1);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
   // 监听滚动，更新当前激活的Day
   useEffect(() => {
@@ -122,22 +126,30 @@ const TripDetailPage: React.FC<TripDetailPageProps> = ({
   return (
     <div className="h-screen bg-white flex flex-col max-w-md mx-auto overflow-hidden">
       {/* 头部 */}
-      <div className="bg-white border-b border-gray-100 px-4 py-4 flex items-center justify-between sticky top-0 z-10">
+      <div className="bg-white border-b border-gray-100 px-4 py-4 flex items-center sticky top-0 z-10 relative">
         <button
           onClick={onBack}
-          className="p-2 hover:bg-gray-100 rounded-full transition-colors"
+          className="absolute left-4 p-2 hover:bg-gray-100 rounded-full transition-colors"
         >
           <ArrowLeft className="w-6 h-6 text-gray-600" />
         </button>
-        <h2 className="text-lg font-semibold text-gray-800">行程详情</h2>
-        <div className="w-10"></div> {/* 占位符保持居中 */}
+        <h2 className="text-lg font-semibold text-gray-800 w-full text-center">行程详情</h2>
+        {onDelete && (
+          <button
+            onClick={() => setShowDeleteConfirm(true)}
+            className="absolute right-4 p-2 hover:bg-red-50 rounded-full transition-colors group"
+            title="删除行程"
+          >
+            <Trash2 className="w-5 h-5 text-gray-400 group-hover:text-red-500 transition-colors" />
+          </button>
+        )}
       </div>
 
       {/* 内容区域 */}
       <div className="flex-1 overflow-y-auto custom-scrollbar">
         {/* 行程头部信息 */}
         <div className="p-4">
-          <div className="flex items-start gap-4 mb-4">
+          <div className="flex items-start gap-4 mb-2">
             <img
               src={trip.image}
               alt={trip.title}
@@ -146,7 +158,6 @@ const TripDetailPage: React.FC<TripDetailPageProps> = ({
             <div className="flex-1">
               <h3 className="text-xl font-bold text-gray-800 mb-2">{trip.title}</h3>
               <div className="flex items-center gap-2 mb-2">
-                {getStatusIcon(trip.status)}
                 <span className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusBgColor(trip.status)}`}>
                   {getStatusText(trip.status)}
                 </span>
@@ -170,13 +181,11 @@ const TripDetailPage: React.FC<TripDetailPageProps> = ({
               </div>
             </div>
           </div>
-
-
         </div>
 
         {/* 天数快速定位标签 - 置顶固定 */}
-        <div className="sticky top-0 z-20 bg-white border-b border-gray-100 px-4 py-3">
-          <div className="flex bg-gray-100 rounded-xl p-1">
+        <div className="sticky top-0 z-20 bg-white border-b border-gray-100 px-4 py-1">
+          <div className="flex items-center gap-6">
             {(() => {
               const days = Math.ceil((trip.duration?.includes('天') ? parseInt(trip.duration) : 1));
               return Array.from({ length: days }, (_, index) => {
@@ -185,14 +194,14 @@ const TripDetailPage: React.FC<TripDetailPageProps> = ({
                   <button
                     key={dayNumber}
                     onClick={() => {
-                      // 快速定位到对应的Day，考虑置顶tab的高度
+                      // 快速定位到对应的Day，考虑置顶标签的高度
                       const dayElement = document.getElementById(`day-${dayNumber}`);
                       if (dayElement) {
                         const rect = dayElement.getBoundingClientRect();
                         const scrollContainer = dayElement.closest('.overflow-y-auto');
                         if (scrollContainer) {
                           const containerRect = scrollContainer.getBoundingClientRect();
-                          const offset = rect.top - containerRect.top + scrollContainer.scrollTop - 80; // 80px为tab高度的偏移
+                          const offset = rect.top - containerRect.top + scrollContainer.scrollTop - 80; // 80px为标签高度的偏移
                           scrollContainer.scrollTo({
                             top: offset,
                             behavior: 'smooth'
@@ -200,13 +209,16 @@ const TripDetailPage: React.FC<TripDetailPageProps> = ({
                         }
                       }
                     }}
-                    className={`flex-1 py-2 px-4 rounded-lg text-sm font-medium transition-all ${
+                    className={`relative py-2 text-sm font-medium transition-all ${
                       activeDay === dayNumber
-                        ? 'bg-white text-blue-600 shadow-sm font-semibold'
-                        : 'text-gray-600 hover:text-gray-800 hover:bg-white hover:shadow-sm'
+                        ? 'text-blue-600 font-semibold'
+                        : 'text-gray-600 hover:text-gray-800'
                     }`}
                   >
                     DAY {dayNumber}
+                    {activeDay === dayNumber && (
+                      <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-blue-600 rounded-full"></div>
+                    )}
                   </button>
                 );
               });
@@ -277,6 +289,23 @@ const TripDetailPage: React.FC<TripDetailPageProps> = ({
 
           {trip.attractionList && trip.attractionList.length > 0 ? (
             <div>
+              {/* 原文链接 - 显示在第一个DAY标题上方 */}
+              {trip.sourceLink && (
+                <div className="mb-4 p-3 bg-blue-50 rounded-xl border border-blue-100">
+                  <div className="flex items-center gap-2 text-sm">
+                    <span className="text-blue-600 font-medium">原文链接：</span>
+                    <a
+                      href={trip.sourceLink}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-blue-500 hover:text-blue-700 underline truncate flex-1"
+                    >
+                      {trip.sourceLink}
+                    </a>
+                  </div>
+                </div>
+              )}
+
               {/* 显示所有天数的景点 */}
               {(() => {
                 // 计算每天的景点分配
@@ -290,7 +319,7 @@ const TripDetailPage: React.FC<TripDetailPageProps> = ({
                   const dayAttractions = trip.attractionList.slice(startIndex, endIndex);
 
                   return (
-                    <div key={dayNumber} id={`day-${dayNumber}`} className="mb-6">
+                    <div key={dayNumber} id={`day-${dayNumber}`} className="mb-4">
                       {/* Day标题 */}
                       <div className="flex items-center gap-2 mb-3">
                         <div className="w-6 h-6 bg-purple-500 text-white rounded-full flex items-center justify-center text-sm font-medium">
@@ -304,44 +333,54 @@ const TripDetailPage: React.FC<TripDetailPageProps> = ({
                       <div className="space-y-3 pl-8">
                         {dayAttractions.map((attraction, index) => (
                           <div key={attraction.id} className="bg-gray-50 rounded-2xl p-4">
-                            <div className="flex items-start gap-3">
+                            {/* 序号和图片行 */}
+                            <div className="flex items-start gap-3 mb-3">
                               {/* 时间序号 */}
                               <div className="text-sm font-medium text-gray-800 flex-shrink-0 w-4">
                                 {index + 1}
                               </div>
-                              
+
                               {/* 地点图片 */}
                               <img
                                 src={attraction.image}
                                 alt={attraction.name}
                                 className="w-16 h-16 rounded-xl object-cover flex-shrink-0"
                               />
-                              
-                              {/* 地点信息 */}
+
+                              {/* 标题和地址 */}
                               <div className="flex-1 min-w-0">
-                                <h6 className="font-semibold text-gray-800 mb-1 truncate">
+                                {/* 大标题：地点名称 */}
+                                <h6 className="text-lg font-bold text-gray-800 mb-1 truncate">
                                   {attraction.name}
                                 </h6>
-                                <p className="text-sm text-gray-600 mb-2 line-clamp-2">
+                                {/* 小标题：地址 */}
+                                <p className="text-sm text-gray-600 line-clamp-2">
                                   {attraction.address}
                                 </p>
-                                {attraction.description && (
-                                  <p className="text-xs text-gray-500 line-clamp-2 mb-3">
+                              </div>
+                            </div>
+
+                            {/* 推荐理由单独显示在图片下方 */}
+                            {attraction.description && (
+                              <div className="mb-3 pl-7">
+                                <div className="flex items-start gap-2">
+                                  <ThumbsUp className="w-4 h-4 text-blue-500 mt-0.5 flex-shrink-0" />
+                                  <p className="text-sm text-gray-700 leading-relaxed">
                                     {attraction.description}
                                   </p>
-                                )}
-                                
-                                {/* 导航按钮 */}
-                                <div className="flex gap-2">
-                                  <button
-                                    onClick={() => onNavigate(attraction.address, attraction.coordinates)}
-                                    className="bg-white text-green-600 px-3 py-1.5 rounded-lg text-xs font-medium border border-green-200 hover:bg-green-50 transition-colors flex items-center gap-1"
-                                  >
-                                    <Navigation className="w-3 h-3" />
-                                    导航
-                                  </button>
                                 </div>
                               </div>
+                            )}
+
+                            {/* 导航按钮 */}
+                            <div className="flex gap-2 pl-7">
+                              <button
+                                onClick={() => onNavigate(attraction.address, attraction.coordinates)}
+                                className="bg-white text-green-600 px-3 py-1.5 rounded-lg text-xs font-medium border border-green-200 hover:bg-green-50 transition-colors flex items-center gap-1"
+                              >
+                                <Navigation className="w-3 h-3" />
+                                导航
+                              </button>
                             </div>
                           </div>
                         ))}
@@ -361,6 +400,40 @@ const TripDetailPage: React.FC<TripDetailPageProps> = ({
           )}
         </div>
       </div>
+
+      {/* 删除确认弹窗 */}
+      {showDeleteConfirm && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[9999] p-4">
+          <div className="bg-white rounded-2xl p-6 max-w-sm w-full mx-4 shadow-2xl">
+            <div className="text-center">
+              <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                <Trash2 className="w-8 h-8 text-red-500" />
+              </div>
+              <h3 className="text-lg font-semibold text-gray-800 mb-2">删除行程</h3>
+              <p className="text-gray-600 mb-6">
+                确定要删除「{trip.title}」这个行程吗？删除后将无法恢复。
+              </p>
+              <div className="flex gap-3">
+                <button
+                  onClick={() => setShowDeleteConfirm(false)}
+                  className="flex-1 py-3 px-4 bg-gray-100 text-gray-700 rounded-xl font-medium hover:bg-gray-200 transition-colors"
+                >
+                  取消
+                </button>
+                <button
+                  onClick={() => {
+                    setShowDeleteConfirm(false);
+                    onDelete?.(trip.id);
+                  }}
+                  className="flex-1 py-3 px-4 bg-red-500 text-white rounded-xl font-medium hover:bg-red-600 transition-colors"
+                >
+                  删除
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

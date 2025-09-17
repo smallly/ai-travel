@@ -88,17 +88,27 @@ class PasswordManager:
     
     @staticmethod
     def verify_password(password: str, hashed_password: str) -> bool:
-        """验证密码（简单版本用于测试）"""
+        """验证密码 - 支持多种哈希格式"""
         try:
-            if '$' not in hashed_password:
-                return False
-            
-            salt, stored_hash = hashed_password.split('$', 1)
-            password_bytes = password.encode('utf-8')
-            computed_hash = hashlib.pbkdf2_hmac('sha256', password_bytes, salt.encode(), 100000)
-            
-            return computed_hash.hex() == stored_hash
-        except Exception:
+            # 支持 Werkzeug 格式: pbkdf2:sha256:iterations$salt$hash
+            if hashed_password.startswith('pbkdf2:sha256:'):
+                from werkzeug.security import check_password_hash
+                return check_password_hash(hashed_password, password)
+
+            # 支持自定义格式: salt$hash
+            elif '$' in hashed_password:
+                salt, stored_hash = hashed_password.split('$', 1)
+                password_bytes = password.encode('utf-8')
+                computed_hash = hashlib.pbkdf2_hmac('sha256', password_bytes, salt.encode(), 100000)
+                return computed_hash.hex() == stored_hash
+
+            # 支持简单MD5格式（不推荐但兼容旧数据）
+            elif len(hashed_password) == 32:  # MD5 length
+                return hashlib.md5(password.encode()).hexdigest() == hashed_password
+
+            return False
+        except Exception as e:
+            print(f"密码验证错误: {e}")
             return False
 
 

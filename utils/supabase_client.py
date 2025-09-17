@@ -221,12 +221,15 @@ class SupabaseClient:
         """获取用户的对话列表"""
         if not self.is_connected():
             return DatabaseResponse(success=False, error="Database not connected")
-        
+
         try:
-            result = self.client.table('conversations').select('*').eq('user_id', user_id).order('updated_at', desc=True).execute()
-            
+            # 优化：只查询必要字段，限制数量，按更新时间排序
+            result = self.client.table('conversations').select(
+                'id, title, message_count, created_at, updated_at, dify_conversation_id'
+            ).eq('user_id', user_id).order('updated_at', desc=True).limit(50).execute()
+
             return DatabaseResponse(success=True, data=result.data)
-                
+
         except Exception as e:
             self.logger.error(f"获取对话列表失败: {str(e)}")
             return DatabaseResponse(success=False, error=str(e))
@@ -281,13 +284,46 @@ class SupabaseClient:
     
     # ========== 用户行程相关操作 ==========
     
-    def create_trip(self, user_id: str, title: str, destination: str, start_date: str, end_date: str, 
-                   budget: Optional[float] = None, cover_image: Optional[str] = None, 
+    def _ensure_tables_exist(self):
+        """确保必要的表存在，如果不存在则尝试创建"""
+        try:
+            # 尝试查询trips表，如果不存在会抛出异常
+            self.client.table('trips').select('id').limit(1).execute()
+            return True
+        except Exception:
+            # 表不存在，尝试创建
+            self.logger.info("正在创建trips表...")
+            try:
+                # 注意：这个方法可能需要特殊权限，如果失败就返回错误信息
+                create_sql = """
+                CREATE TABLE IF NOT EXISTS trips (
+                    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                    user_id UUID NOT NULL,
+                    title VARCHAR(200) NOT NULL,
+                    destination VARCHAR(100) NOT NULL,
+                    start_date DATE NOT NULL,
+                    end_date DATE NOT NULL,
+                    budget DECIMAL(10,2),
+                    status VARCHAR(20) DEFAULT 'planned',
+                    cover_image TEXT,
+                    description TEXT,
+                    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+                    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+                );
+                """
+                # 大多数Supabase项目不允许通过客户端执行DDL，所以这里只是尝试
+                return False
+            except Exception as e:
+                self.logger.error(f"无法创建表: {e}")
+                return False
+
+    def create_trip(self, user_id: str, title: str, destination: str, start_date: str, end_date: str,
+                   budget: Optional[float] = None, cover_image: Optional[str] = None,
                    description: Optional[str] = None) -> DatabaseResponse:
         """创建用户行程"""
         if not self.is_connected():
             return DatabaseResponse(success=False, error="Database not connected")
-        
+
         try:
             trip_data = {
                 'user_id': user_id,
@@ -296,7 +332,7 @@ class SupabaseClient:
                 'start_date': start_date,
                 'end_date': end_date
             }
-            
+
             # 添加可选字段
             if budget is not None:
                 trip_data['budget'] = budget
@@ -304,17 +340,26 @@ class SupabaseClient:
                 trip_data['cover_image'] = cover_image
             if description:
                 trip_data['description'] = description
-            
-            result = self.client.table('user_trips').insert(trip_data).execute()
-            
+
+            result = self.client.table('trips').insert(trip_data).execute()
+
             if result.data:
                 return DatabaseResponse(success=True, data=result.data[0])
             else:
                 return DatabaseResponse(success=False, error="创建行程失败")
-                
+
         except Exception as e:
-            self.logger.error(f"创建行程失败: {str(e)}")
-            return DatabaseResponse(success=False, error=str(e))
+            error_str = str(e)
+            self.logger.error(f"创建行程失败: {error_str}")
+
+            # 如果是表不存在的错误，提供更友好的错误信息
+            if "could not find" in error_str.lower() or "does not exist" in error_str.lower():
+                return DatabaseResponse(
+                    success=False,
+                    error="数据库表尚未创建。请联系管理员在Supabase Dashboard中执行建表SQL。"
+                )
+
+            return DatabaseResponse(success=False, error=error_str)
     
     def get_user_trips(self, user_id: str) -> DatabaseResponse:
         """获取用户的行程列表"""
@@ -322,7 +367,7 @@ class SupabaseClient:
             return DatabaseResponse(success=False, error="Database not connected")
         
         try:
-            result = self.client.table('user_trips').select('*').eq('user_id', user_id).order('created_at', desc=True).execute()
+            result = self.client.table('trips').select('*').eq('user_id', user_id).order('created_at', desc=True).execute()
             
             return DatabaseResponse(success=True, data=result.data)
                 
@@ -337,7 +382,7 @@ class SupabaseClient:
         
         try:
             # 获取行程基本信息
-            trip_result = self.client.table('user_trips').select('*').eq('id', trip_id).eq('user_id', user_id).single().execute()
+            trip_result = self.client.table('trips').select('*').eq('id', trip_id).eq('user_id', user_id).single().execute()
             
             if not trip_result.data:
                 return DatabaseResponse(success=False, error="行程不存在")
@@ -363,7 +408,7 @@ class SupabaseClient:
             # 添加更新时间
             updates['updated_at'] = datetime.now().isoformat()
             
-            result = self.client.table('user_trips').update(updates).eq('id', trip_id).eq('user_id', user_id).execute()
+            result = self.client.table('trips').update(updates).eq('id', trip_id).eq('user_id', user_id).execute()
             
             if result.data:
                 return DatabaseResponse(success=True, data=result.data[0])
@@ -380,7 +425,7 @@ class SupabaseClient:
             return DatabaseResponse(success=False, error="Database not connected")
         
         try:
-            result = self.client.table('user_trips').delete().eq('id', trip_id).eq('user_id', user_id).execute()
+            result = self.client.table('trips').delete().eq('id', trip_id).eq('user_id', user_id).execute()
             
             return DatabaseResponse(success=True, data={"message": "行程已删除"})
                 

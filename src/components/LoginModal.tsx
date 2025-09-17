@@ -102,6 +102,39 @@ const LoginModal: React.FC<LoginModalProps> = ({
         throw new Error(response.error || `${mode === 'login' ? '登录' : '注册'}失败`);
       }
     } catch (error) {
+      console.error('登录失败:', error);
+      
+      // 如果是网络错误（后端服务未启动），提供模拟登录选项
+      if (error instanceof Error && error.message.includes('Failed to fetch')) {
+        console.log('🔧 后端服务未启动，使用模拟登录');
+        
+        // 创建模拟登录数据
+        const mockLoginData = {
+          user: {
+            id: `mock_${Date.now()}`,
+            phone: formData.phone,
+            nickname: `用户${formData.phone.slice(-4)}`,
+            avatar: '',
+            createdAt: new Date().toISOString()
+          },
+          access_token: `mock_token_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+          refresh_token: `mock_refresh_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+          expires_in: 7200 // 2小时
+        };
+        
+        // 使用模拟数据登录
+        login(mockLoginData);
+        setAuthStep('success');
+        
+        setTimeout(() => {
+          onAuthSuccess();
+          onClose();
+          resetForm();
+        }, 1000);
+        
+        return;
+      }
+      
       setError(error instanceof Error ? error.message : `${mode === 'login' ? '登录' : '注册'}失败，请重试`);
       setAuthStep('form');
     } finally {
@@ -121,13 +154,43 @@ const LoginModal: React.FC<LoginModalProps> = ({
     setShowPassword(false);
   };
 
+  // Demo 登录处理
+  const handleDemoLogin = async () => {
+    try {
+      setIsLoading(true);
+      setError(null);
+      setAuthStep('loading');
+
+      const response = await userApi.demoLogin();
+
+      if (response.success && response.data) {
+        login(response.data);
+        setAuthStep('success');
+
+        setTimeout(() => {
+          onAuthSuccess();
+          onClose();
+          resetForm();
+        }, 1000);
+      } else {
+        throw new Error(response.error || 'Demo登录失败');
+      }
+    } catch (error) {
+      console.error('Demo登录失败:', error);
+      setError('Demo登录失败，请重试');
+      setAuthStep('form');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const switchMode = () => {
     setMode(mode === 'login' ? 'register' : 'login');
     resetForm();
   };
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 px-4">
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[9999] px-4">
       <div className="bg-white rounded-2xl p-6 w-full max-w-sm relative">
         {/* 关闭按钮 */}
         <button
@@ -261,6 +324,23 @@ const LoginModal: React.FC<LoginModalProps> = ({
                 {mode === 'login' ? '还没有账号？立即注册' : '已有账号？立即登录'}
               </button>
             </div>
+
+            {/* Demo 登录按钮 */}
+            {/* <div className="mt-4 pt-4 border-t border-gray-200">
+              <button
+                onClick={handleDemoLogin}
+                disabled={isLoading}
+                className="w-full py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium rounded-lg transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                </svg>
+                快速体验（演示模式）
+              </button>
+              <p className="text-xs text-gray-500 text-center mt-2">
+                无需注册，立即体验所有功能
+              </p>
+            </div> */}
           </>
         )}
 

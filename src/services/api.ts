@@ -70,6 +70,7 @@ export interface Trip {
   status: 'planned' | 'ongoing' | 'completed' | 'cancelled';
   cover_image?: string;
   description?: string;
+  source_link?: string; // 原文链接
   created_at: string;
   updated_at: string;
 }
@@ -92,16 +93,22 @@ export interface TripDetails extends Trip {
   activities?: TripActivity[];
 }
 
+// 通用请求函数接口
+interface RequestOptions extends RequestInit {
+  silent?: boolean; // 静默模式，不记录错误日志
+}
+
 // 通用请求函数
-async function request<T>(endpoint: string, options: RequestInit = {}): Promise<ApiResponse<T>> {
+async function request<T>(endpoint: string, options: RequestOptions = {}): Promise<ApiResponse<T>> {
   try {
     const url = `${API_BASE_URL}${endpoint}`;
+    const { silent = false, ...fetchOptions } = options;
     
     // 获取认证token
-    const token = localStorage.getItem('access_token');
+    const token = localStorage.getItem('auth_token');
     const headers: HeadersInit = {
       'Content-Type': 'application/json',
-      ...options.headers,
+      ...fetchOptions.headers,
     };
     
     // 如果有token，添加到请求头
@@ -111,7 +118,7 @@ async function request<T>(endpoint: string, options: RequestInit = {}): Promise<
     
     const response = await fetch(url, {
       headers,
-      ...options,
+      ...fetchOptions,
     });
 
     const data = await response.json();
@@ -122,7 +129,10 @@ async function request<T>(endpoint: string, options: RequestInit = {}): Promise<
 
     return data;
   } catch (error) {
-    console.error(`API请求失败 [${endpoint}]:`, error);
+    // 只在非静默模式下记录错误
+    if (!options.silent) {
+      console.error(`API请求失败 [${endpoint}]:`, error);
+    }
     return {
       success: false,
       error: error instanceof Error ? error.message : '网络请求失败',
@@ -171,6 +181,14 @@ export const chatApi = {
   async deleteConversation(conversationId: string): Promise<ApiResponse<any>> {
     return request(`/conversations/${conversationId}`, {
       method: 'DELETE'
+    });
+  },
+
+  // 更新对话标题
+  async updateConversation(conversationId: string, title: string): Promise<ApiResponse<any>> {
+    return request(`/conversations/${conversationId}`, {
+      method: 'PUT',
+      body: JSON.stringify({ title })
     });
   }
 };
@@ -226,6 +244,14 @@ export const userApi = {
   //     body: JSON.stringify(encryptedData)
   //   });
   // },
+
+  // Demo登录 - 用于测试
+  async demoLogin(): Promise<ApiResponse<{ user: any; access_token: string; refresh_token: string; expires_in: number }>> {
+    return request('/auth/demo-login', {
+      method: 'POST',
+      body: JSON.stringify({})
+    });
+  },
 
   // 手机号密码登录
   async loginWithPhone(phone: string, password: string): Promise<ApiResponse<{ user: any; access_token: string; refresh_token: string; expires_in: number }>> {
@@ -285,7 +311,7 @@ export const userApi = {
 export const tripApi = {
   // 获取用户行程列表
   async getUserTrips(): Promise<ApiResponse<Trip[]>> {
-    return request('/trips');
+    return request('/trips', { silent: true }); // 静默模式，不显示错误日志
   },
 
   // 创建新行程
@@ -297,6 +323,7 @@ export const tripApi = {
     budget?: number;
     cover_image?: string;
     description?: string;
+    source_link?: string;
   }): Promise<ApiResponse<Trip>> {
     return request('/trips', {
       method: 'POST',

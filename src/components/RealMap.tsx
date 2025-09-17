@@ -30,6 +30,7 @@ interface RealMapProps {
 const RealMap: React.FC<RealMapProps> = ({ locations, className, onLocationClick }) => {
   const [map, setMap] = useState<any>(null);
   const [markers, setMarkers] = useState<any[]>([]);
+  const [polylines, setPolylines] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string>('');
   
@@ -163,14 +164,134 @@ const RealMap: React.FC<RealMapProps> = ({ locations, className, onLocationClick
               throw new Error(`地图容器尺寸异常: ${rect.width}x${rect.height}，请检查CSS样式`);
             }
 
+            // 计算地图中心点和缩放级别
+            let initialZoom = 10;
+            let initialCenter = [116.4074, 39.9042]; // 默认北京坐标（经度，纬度）
+
+            console.log('🎯 传入的locations数量:', locations.length);
+
+            if (locations.length > 0) {
+              const validLocs = locations.filter(loc => loc.realCoordinates);
+              console.log('🎯 有效坐标的locations数量:', validLocs.length);
+
+              if (validLocs.length > 0) {
+                // 打印所有坐标用于调试
+                validLocs.forEach((loc, index) => {
+                  console.log(`🎯 Location ${index}:`, loc.name, '坐标:', loc.realCoordinates);
+                });
+
+                if (validLocs.length === 1) {
+                  const { lat, lng } = validLocs[0].realCoordinates!;
+                  console.log('🎯 单个点位坐标:', lng, lat);
+
+                  // 检查坐标是否合理（全球范围内）
+                  if (lng >= -180 && lng <= 180 && lat >= -90 && lat <= 90) {
+                    initialCenter = [lng, lat];
+                    initialZoom = 12; // 单个点位放大一些
+                    console.log('🎯 使用单个点位坐标');
+                  } else {
+                    console.log('🎯 单个点位坐标超出合理范围，使用北京坐标');
+                  }
+                } else {
+                  // 多个点位，计算中心点
+                  const lngs = validLocs.map(loc => loc.realCoordinates!.lng);
+                  const lats = validLocs.map(loc => loc.realCoordinates!.lat);
+                  const centerLng = (Math.max(...lngs) + Math.min(...lngs)) / 2;
+                  const centerLat = (Math.max(...lats) + Math.min(...lats)) / 2;
+
+                  console.log('🎯 计算出的多点中心:', centerLng, centerLat);
+                  console.log('🎯 坐标范围: 经度', Math.min(...lngs), '~', Math.max(...lngs), '纬度', Math.min(...lats), '~', Math.max(...lats));
+
+                  // 放宽坐标范围检查，确保计算出的中心点合理
+                  if (centerLng >= -180 && centerLng <= 180 && centerLat >= -90 && centerLat <= 90) {
+                    initialCenter = [centerLng, centerLat];
+                    console.log('🎯 使用计算的多点中心坐标');
+
+                    // 根据点位分布调整缩放级别
+                    const lngSpan = Math.max(...lngs) - Math.min(...lngs);
+                    const latSpan = Math.max(...lats) - Math.min(...lats);
+                    const maxSpan = Math.max(lngSpan, latSpan);
+
+                    if (maxSpan < 0.05) initialZoom = 14;
+                    else if (maxSpan < 0.1) initialZoom = 12;
+                    else if (maxSpan < 0.5) initialZoom = 10;
+                    else if (maxSpan < 2) initialZoom = 8;
+                    else initialZoom = 6;
+
+                    console.log('🎯 使用多点计算中心，缩放级别:', initialZoom);
+                  } else {
+                    console.log('🎯 多点中心超出合理范围，使用北京坐标');
+                  }
+                }
+              } else {
+                console.log('🎯 没有有效坐标，使用北京默认坐标');
+              }
+            } else {
+              console.log('🎯 没有传入locations，使用北京默认坐标');
+            }
+
+            console.log('🎯 最终使用的地图位置:', initialCenter, '缩放:', initialZoom);
+
             // 创建地图实例
             const mapInstance = new window.AMap.Map(mapContainer, {
-              zoom: 4,
-              center: [108.953, 34.266], // 中国地理中心（西安附近，更适合显示全国）
-              mapStyle: 'amap://styles/normal',
-              features: ['bg', 'road', 'building'],
+              zoom: initialZoom,
+              center: initialCenter,
+              mapStyle: 'amap://styles/normal', // 使用标准样式便于自定义
+              features: ['bg', 'road'], // 显示背景和主要道路
               viewMode: '2D'
             });
+
+            // 地图创建后立即验证中心点
+            setTimeout(() => {
+              const currentCenter = mapInstance.getCenter();
+              console.log('🎯 地图创建后的实际中心点:', currentCenter.lng, currentCenter.lat);
+              console.log('🎯 预期中心点:', initialCenter[0], initialCenter[1]);
+
+              // 检查坐标是否偏差过大
+              const lngDiff = Math.abs(currentCenter.lng - initialCenter[0]);
+              const latDiff = Math.abs(currentCenter.lat - initialCenter[1]);
+              if (lngDiff > 5 || latDiff > 5) {
+                console.error('❌ 地图中心点与预期差异过大!');
+                console.error('实际中心:', currentCenter.lng, currentCenter.lat);
+                console.error('预期中心:', initialCenter[0], initialCenter[1]);
+                console.error('差异:', lngDiff, latDiff);
+
+                // 强制设置正确的中心点
+                console.log('🔧 强制重新设置地图中心点');
+                mapInstance.setCenter(initialCenter);
+              }
+            }, 1000);
+
+            // 自定义地图样式
+            try {
+              mapInstance.setMapStyle({
+                styleId: 'normal',
+                features: ['bg', 'road'],
+                // 设置水域颜色为蓝色
+                styleJson: [{
+                  featureType: 'water',
+                  elementType: 'all',
+                  stylers: {
+                    color: '#C5E5FE' // RGB(197,229,254) 浅蓝色
+                  }
+                }, {
+                  featureType: 'background',
+                  elementType: 'all',
+                  stylers: {
+                    color: '#FFFFFF' // 白色背景
+                  }
+                }, {
+                  featureType: 'road',
+                  elementType: 'all',
+                  stylers: {
+                    visibility: 'simplified' // 只显示主干道
+                  }
+                }]
+              });
+              console.log('🎨 地图样式自定义成功');
+            } catch (styleError) {
+              console.warn('⚠️ 地图样式自定义失败，使用默认样式:', styleError);
+            }
 
             console.log('🎯 地图实例创建成功:', mapInstance);
 
@@ -291,16 +412,19 @@ const RealMap: React.FC<RealMapProps> = ({ locations, className, onLocationClick
     };
 
     waitForContainer();
-  }, []); // 只初始化一次
+  }, [locations]); // 依赖locations数据，确保地图初始化时有正确的中心位置
 
   // 更新地图标记
   useEffect(() => {
     console.log('🔄 更新地图标记，locations:', locations.length);
     if (!map || !locations.length) return;
 
-    // 清除旧标记
+    // 清除旧标记和连线
     markers.forEach(marker => {
       map.remove(marker);
+    });
+    polylines.forEach(polyline => {
+      map.remove(polyline);
     });
 
     const newMarkers: any[] = [];
@@ -317,13 +441,13 @@ const RealMap: React.FC<RealMapProps> = ({ locations, className, onLocationClick
       const { lat, lng } = location.realCoordinates;
       console.log('📍 添加标记:', location.name, `经度:${lng}, 纬度:${lat}`);
       
-      // 根据天数决定颜色
+      // 根据天数决定颜色 - 统一使用紫色主题
       const dayColors = {
-        1: { bg: 'bg-blue-500', text: 'text-blue-600', label: 'DAY 1' },
-        2: { bg: 'bg-green-500', text: 'text-green-600', label: 'DAY 2' },
-        3: { bg: 'bg-purple-500', text: 'text-purple-600', label: 'DAY 3' },
-        4: { bg: 'bg-orange-500', text: 'text-orange-600', label: 'DAY 4' },
-        5: { bg: 'bg-red-500', text: 'text-red-600', label: 'DAY 5' }
+        1: { bg: 'bg-purple-500', text: 'text-purple-600', label: 'DAY 1' },
+        2: { bg: 'bg-purple-600', text: 'text-purple-700', label: 'DAY 2' },
+        3: { bg: 'bg-purple-700', text: 'text-purple-800', label: 'DAY 3' },
+        4: { bg: 'bg-purple-800', text: 'text-purple-900', label: 'DAY 4' },
+        5: { bg: 'bg-purple-900', text: 'text-purple-950', label: 'DAY 5' }
       };
       
       const dayNumber = location.dayNumber || 1;
@@ -367,47 +491,61 @@ const RealMap: React.FC<RealMapProps> = ({ locations, className, onLocationClick
       newMarkers.push(marker);
 
       // 添加到边界
+      console.log(`📍 添加标记到bounds - ${location.name}: lng=${lng}, lat=${lat}`);
       bounds.extend(new window.AMap.LngLat(lng, lat));
     });
 
     setMarkers(newMarkers);
 
+    // 不再创建连线，保持地图简洁
+    const newPolylines: any[] = [];
+    setPolylines(newPolylines);
+
     console.log('🗺️ 有效位置数量:', validLocationCount);
     console.log('🗺️ 当前地图中心:', map.getCenter());
     console.log('🗺️ 当前地图缩放:', map.getZoom());
 
-    // 智能调整地图视野
+    // 智能调整地图视野 - 确保所有点位都可见
     if (validLocationCount === 0) {
       console.log('🇨🇳 无标记，保持中国默认视图');
-      map.setZoomAndCenter(4, [108.953, 34.266]);
-    } else if (validLocationCount > 1) {
-      // 计算标记的地理跨度
-      const lngs = locations.filter(loc => loc.realCoordinates).map(loc => loc.realCoordinates!.lng);
-      const lats = locations.filter(loc => loc.realCoordinates).map(loc => loc.realCoordinates!.lat);
-      const lngSpan = Math.max(...lngs) - Math.min(...lngs);
-      const latSpan = Math.max(...lats) - Math.min(...lats);
-      
-      console.log('📐 多个标记，经度跨度:', lngSpan.toFixed(4), '纬度跨度:', latSpan.toFixed(4));
-      
-      // 如果所有标记都在很小的范围内（同一个城市），保持中国整体视图
-      if (lngSpan < 1 && latSpan < 1) {
-        console.log('🏙️ 标记集中在同一城市，保持中国整体视图');
-        map.setZoomAndCenter(4, [108.953, 34.266]);
-      } else {
-        console.log('🌏 标记分布较广，调整地图边界');
-        map.setBounds(bounds, false, [20, 20, 20, 20]);
-      }
+      map.setZoomAndCenter(5, [104.066, 30.651]); // 使用成都作为中心，更合适的缩放级别
     } else {
-      console.log('📍 单个标记，保持中国默认视图');
-      const { lat, lng } = locations.find(loc => loc.realCoordinates)?.realCoordinates!;
-      // 检查标记是否在中国境内
-      if (lng >= 73 && lng <= 135 && lat >= 3 && lat <= 53) {
-        console.log('📍 标记在中国境内，保持中国视图');
-        map.setZoomAndCenter(4, [108.953, 34.266]);
-      } else {
-        console.log('📍 标记在中国境外，调整视图');
-        map.setZoomAndCenter(6, [lng, lat]);
-      }
+      // 有标记时，优先使用setBounds确保所有点都可见
+      console.log('📐 有标记，使用自适应边界确保所有点可见');
+
+      // 检查bounds是否有效
+      const boundsSW = bounds.getSouthWest();
+      const boundsNE = bounds.getNorthEast();
+      console.log('📐 Bounds 西南角:', boundsSW.lng, boundsSW.lat);
+      console.log('📐 Bounds 东北角:', boundsNE.lng, boundsNE.lat);
+
+      // 计算bounds的中心点（用于对比）
+      const boundsCenter = bounds.getCenter();
+      console.log('📐 Bounds计算的中心:', boundsCenter.lng, boundsCenter.lat);
+
+      // 使用较大的padding，确保标记不会贴边显示，且视野更宽松
+      map.setBounds(bounds, false, [60, 60, 60, 60]);
+
+      // 验证setBounds后的实际中心
+      setTimeout(() => {
+        const actualCenter = map.getCenter();
+        console.log('📐 setBounds后的实际中心:', actualCenter.lng, actualCenter.lat);
+      }, 100);
+
+      // 延迟微调，确保视野合适
+      setTimeout(() => {
+        const currentZoom = map.getZoom();
+        console.log('🔍 自动调整后的缩放级别:', currentZoom);
+
+        // 对缩放级别进行合理限制
+        if (currentZoom > 15) {
+          console.log('🔽 缩放级别过高，适当降低到14');
+          map.setZoom(14);
+        } else if (currentZoom < 4) {
+          console.log('🔼 缩放级别过低，适当提高到6');
+          map.setZoom(6);
+        }
+      }, 300); // 增加延迟确保setBounds完全生效
     }
 
   }, [map, locations, onLocationClick]);
@@ -459,7 +597,7 @@ const RealMap: React.FC<RealMapProps> = ({ locations, className, onLocationClick
                 }}
               >
                 <div className="relative">
-                  <div className="w-6 h-6 bg-red-500 rounded-full flex items-center justify-center shadow-lg animate-pulse">
+                  <div className="w-6 h-6 bg-purple-500 rounded-full flex items-center justify-center shadow-lg animate-pulse">
                     <MapPin className="w-4 h-4 text-white" />
                   </div>
                   <div className="absolute -bottom-8 left-1/2 transform -translate-x-1/2 bg-white px-2 py-1 rounded shadow text-xs whitespace-nowrap border">
