@@ -1,0 +1,42 @@
+Railway环境变量配置清单
+=========================
+
+以下是需要在Railway中配置的环境变量，请逐一复制粘贴：
+
+1. SECRET_KEY
+ai-travel-production-secret-2024
+
+2. DEBUG
+False
+
+3. DIFY_API_KEY
+app-EFD7kwDBamONWVjo6DvSYojS
+
+4. DIFY_API_URL
+https://api.dify.ai/v1
+
+5. SUPABASE_URL
+https://dyxvnarknlcatrpxeshe.supabase.co
+
+6. SUPABASE_ANON_KEY
+eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImR5eHZuYXJrbmxjYXRycHhlc2hlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTc1Njg5NjQsImV4cCI6MjA3MzE0NDk2NH0.ERK4rjCVXlKdqR_NHde4AoqF7DoKfBngYi4lDpsxiLk
+
+7. SUPABASE_SERVICE_KEY
+eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImR5eHZuYXJrbmxjYXRycHhlc2hlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTc1Njg5NjQsImV4cCI6MjA3MzE0NDk2NH0.ERK4rjCVXlKdqR_NHde4AoqF7DoKfBngYi4lDpsxiLk
+
+8. SUPABASE_JWT_SECRET
+2tHKUFnOSaW3SNSS2qOfzBK0ArfhZuVd49HOQSfOhxWigBrQTQeGlAzzCacVVXO6hN8Z+TQ6rE6nE9oOWSP/jQ==
+
+9. WECHAT_APP_ID
+wxcf1bea177d6b93ec
+
+10. WECHAT_APP_SECRET
+0dede431b9b3bb68ab94d26b0d6c7142
+
+11. TIMEZONE
+Asia/Shanghai
+
+配置提示：
+- 变量名和值之间不要加等号
+- 每个变量单独一行添加
+- 确保没有多余的空格

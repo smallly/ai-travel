@@ -1087,5 +1087,11 @@ if __name__ == '__main__':
     app.logger.info(f'🤖 Dify API: {dify_config.API_BASE_URL}')
     app.logger.info(f'📊 数据库: Supabase')
     
-    # 启动应用
-    app.run(host=app_config.HOST, port=app_config.PORT, debug=app_config.DEBUG)
+    # 生产环境检查
+    if os.environ.get('RAILWAY_ENVIRONMENT') or os.environ.get('PORT'):
+        # Railway或其他云平台环境
+        port = int(os.environ.get('PORT', app_config.PORT))
+        app.run(host='0.0.0.0', port=port, debug=False)
+    else:
+        # 本地开发环境
+        app.run(host=app_config.HOST, port=app_config.PORT, debug=app_config.DEBUG)

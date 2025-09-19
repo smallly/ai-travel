@@ -31,9 +31,12 @@ ENV PYTHONUNBUFFERED=1
 # 暴露端口
 EXPOSE 5000
 
+# 安装curl用于健康检查
+RUN apt-get update && apt-get install -y curl && rm -rf /var/lib/apt/lists/*
+
 # 健康检查
 HEALTHCHECK --interval=30s --timeout=30s --start-period=5s --retries=3 \
-    CMD curl -f http://localhost:5000/api/health || exit 1
+    CMD curl -f http://localhost:${PORT:-5000}/api/health || exit 1
 
-# 启动命令
-CMD ["python", "app.py"]
+# 启动命令（生产环境使用gunicorn）
+CMD ["sh", "-c", "if [ \"$RAILWAY_ENVIRONMENT\" = \"production\" ] || [ -n \"$PORT\" ]; then gunicorn --bind 0.0.0.0:${PORT:-5000} app:app --workers 2 --timeout 120; else python app.py; fi"]

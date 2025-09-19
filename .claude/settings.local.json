@@ -14,7 +14,12 @@
       "Bash(del test_coordinates.js)",
       "Bash(git checkout:*)",
       "Bash(git push:*)",
-      "Bash(git add:*)"
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(docker build:*)",
+      "Bash(railway --version)",
+      "Bash(npm install:*)",
+      "Bash(railway login:*)"
     ],
     "deny": [],
     "ask": []

@@ -1,0 +1,56 @@
+# Git files
+.git
+.gitignore
+
+# Environment files
+.env.local
+.env.development
+.env.test
+
+# Logs
+logs
+*.log
+
+# Runtime data
+pids
+*.pid
+*.seed
+*.pid.lock
+
+# Dependency directories
+node_modules/
+__pycache__/
+*.py[cod]
+*$py.class
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Frontend build (not needed for API-only deployment)
+src/
+public/
+package*.json
+vite.config.ts
+tsconfig*.json
+index.html
+
+# Railway deployment files
+railway-env-config.txt
+
+# Claude settings
+.claude/
+
+# Test files
+test_*
