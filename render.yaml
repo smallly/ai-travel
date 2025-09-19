@@ -1,0 +1,33 @@
+services:
+  - type: web
+    name: ai-travel-assistant
+    env: docker
+    dockerfilePath: ./Dockerfile
+    plan: free
+    region: oregon
+    buildCommand: ""
+    startCommand: ""
+    healthCheckPath: /api/health
+    envVars:
+      - key: SECRET_KEY
+        value: ai-travel-production-secret-2024
+      - key: DEBUG
+        value: "False"
+      - key: DIFY_API_KEY
+        value: app-EFD7kwDBamONWVjo6DvSYojS
+      - key: DIFY_API_URL
+        value: https://api.dify.ai/v1
+      - key: SUPABASE_URL
+        value: https://dyxvnarknlcatrpxeshe.supabase.co
+      - key: SUPABASE_ANON_KEY
+        value: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImR5eHZuYXJrbmxjYXRycHhlc2hlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTc1Njg5NjQsImV4cCI6MjA3MzE0NDk2NH0.ERK4rjCVXlKdqR_NHde4AoqF7DoKfBngYi4lDpsxiLk
+      - key: SUPABASE_SERVICE_KEY
+        value: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImR5eHZuYXJrbmxjYXRycHhlc2hlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTc1Njg5NjQsImV4cCI6MjA3MzE0NDk2NH0.ERK4rjCVXlKdqR_NHde4AoqF7DoKfBngYi4lDpsxiLk
+      - key: SUPABASE_JWT_SECRET
+        value: 2tHKUFnOSaW3SNSS2qOfzBK0ArfhZuVd49HOQSfOhxWigBrQTQeGlAzzCacVVXO6hN8Z+TQ6rE6nE9oOWSP/jQ==
+      - key: WECHAT_APP_ID
+        value: wxcf1bea177d6b93ec
+      - key: WECHAT_APP_SECRET
+        value: 0dede431b9b3bb68ab94d26b0d6c7142
+      - key: TIMEZONE
+        value: Asia/Shanghai
