@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI旅行助手 - 跳转页面</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            text-align: center;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+        }
+        .container {
+            max-width: 400px;
+            margin: 0 auto;
+            padding: 30px;
+            background: rgba(255,255,255,0.1);
+            border-radius: 20px;
+            backdrop-filter: blur(10px);
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+        }
+        .icon {
+            font-size: 48px;
+            margin-bottom: 20px;
+        }
+        h1 {
+            font-size: 24px;
+            margin: 20px 0;
+            font-weight: 600;
+        }
+        .steps {
+            text-align: left;
+            margin: 20px 0;
+            font-size: 16px;
+            line-height: 1.6;
+        }
+        .link {
+            background: rgba(255,255,255,0.2);
+            padding: 15px;
+            border-radius: 10px;
+            font-family: monospace;
+            font-size: 14px;
+            margin: 15px 0;
+            word-break: break-all;
+        }
+        .btn {
+            background: #4CAF50;
+            color: white;
+            padding: 15px 30px;
+            border: none;
+            border-radius: 25px;
+            font-size: 16px;
+            cursor: pointer;
+            margin: 10px;
+            text-decoration: none;
+            display: inline-block;
+        }
+        .btn:hover {
+            background: #45a049;
+        }
+        .copy-btn {
+            background: #2196F3;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="icon">🤖</div>
+        <h1>AI旅行助手</h1>
+        <p>由于微信安全限制，请在浏览器中访问</p>
+
+        <div class="steps">
+            <strong>📱 使用方法：</strong><br>
+            1. 复制下方链接<br>
+            2. 打开手机浏览器<br>
+            3. 粘贴并访问<br>
+        </div>
+
+        <div class="link" id="link">
+            https://ai-travel-6ilc.onrender.com
+        </div>
+
+        <button class="btn copy-btn" onclick="copyLink()">📋 复制链接</button>
+        <a href="https://ai-travel-6ilc.onrender.com" class="btn" target="_blank">🚀 直接访问</a>
+
+        <p style="font-size: 14px; margin-top: 20px; opacity: 0.8;">
+            💡 建议将网址添加到浏览器书签
+        </p>
+    </div>
+
+    <script>
+        function copyLink() {
+            const link = document.getElementById('link').textContent;
+            if (navigator.clipboard) {
+                navigator.clipboard.writeText(link).then(() => {
+                    alert('🎉 链接已复制！\n请打开浏览器粘贴访问');
+                });
+            } else {
+                // 兼容旧版浏览器
+                const textArea = document.createElement('textarea');
+                textArea.value = link;
+                document.body.appendChild(textArea);
+                textArea.select();
+                document.execCommand('copy');
+                document.body.removeChild(textArea);
+                alert('🎉 链接已复制！\n请打开浏览器粘贴访问');
+            }
+        }
+
+        // 自动检测如果不在微信中，直接跳转
+        if (!/micromessenger/i.test(navigator.userAgent)) {
+            setTimeout(() => {
+                window.location.href = 'https://ai-travel-6ilc.onrender.com';
+            }, 2000);
+        }
+    </script>
+</body>
+</html>

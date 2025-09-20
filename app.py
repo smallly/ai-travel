@@ -1084,6 +1084,15 @@ def wechat_verify(filename):
     except FileNotFoundError:
         return "Verification file not found", 404
 
+# 微信跳转页面
+@app.route('/jump')
+def wechat_jump():
+    """微信访问跳转页面"""
+    try:
+        return send_file('jump.html')
+    except FileNotFoundError:
+        return "Jump page not found", 404
+
 # 静态文件服务
 @app.route('/')
 def serve_frontend():
