@@ -1075,6 +1075,15 @@ def update_user_profile():
             'error': str(e)
         }), 500
 
+# 微信验证文件路由
+@app.route('/MP_verify_<filename>')
+def wechat_verify(filename):
+    """微信公众号域名验证文件"""
+    try:
+        return send_from_directory('.', f'MP_verify_{filename}')
+    except FileNotFoundError:
+        return "Verification file not found", 404
+
 # 静态文件服务
 @app.route('/')
 def serve_frontend():
