@@ -1084,15 +1084,6 @@ def wechat_verify(filename):
     except FileNotFoundError:
         return "Verification file not found", 404
 
-# 微信跳转页面
-@app.route('/jump')
-def wechat_jump():
-    """微信访问跳转页面"""
-    try:
-        return send_file('jump.html')
-    except FileNotFoundError:
-        return "Jump page not found", 404
-
 # 静态文件服务
 @app.route('/')
 def serve_frontend():
@@ -1105,6 +1096,15 @@ def serve_frontend():
             'error': '前端文件未找到，请先运行 npm run build',
             'message': 'AI旅行助手API服务正常运行'
         }), 404
+
+# 微信跳转页面 - 必须在catch-all路由之前
+@app.route('/jump')
+def wechat_jump():
+    """微信访问跳转页面"""
+    try:
+        return send_file('jump.html')
+    except FileNotFoundError:
+        return "Jump page not found", 404
 
 @app.route('/<path:path>')
 def serve_static_files(path):
