@@ -310,7 +310,7 @@ def require_auth(f):
 def health_check():
     """健康检查"""
     db_status = supabase_client.test_connection()
-    
+
     return jsonify({
         'status': 'ok',
         'message': 'AI旅行助手API服务正常运行 (Supabase版本)',
@@ -318,6 +318,38 @@ def health_check():
         'version': '2.0.0-supabase',
         'database': 'connected' if db_status.success else 'disconnected'
     })
+
+@app.route('/api/debug/supabase', methods=['GET'])
+def debug_supabase():
+    """调试Supabase连接"""
+    debug_info = {
+        'supabase_url': bool(os.getenv('SUPABASE_URL')),
+        'supabase_anon_key': bool(os.getenv('SUPABASE_ANON_KEY')),
+        'supabase_service_key': bool(os.getenv('SUPABASE_SERVICE_KEY')),
+        'client_initialized': supabase_client.is_connected(),
+        'config_valid': supabase_config.is_configured
+    }
+
+    # 尝试连接测试
+    connection_test = supabase_client.test_connection()
+    debug_info['connection_test'] = {
+        'success': connection_test.success,
+        'error': connection_test.error,
+        'data': connection_test.data
+    }
+
+    # 检查环境变量（脱敏）
+    env_vars = {}
+    for key in ['SUPABASE_URL', 'SUPABASE_ANON_KEY', 'SUPABASE_SERVICE_KEY']:
+        value = os.getenv(key)
+        if value:
+            env_vars[key] = f"{value[:20]}...{value[-10:]}" if len(value) > 30 else value[:10] + "..."
+        else:
+            env_vars[key] = None
+
+    debug_info['environment_variables'] = env_vars
+
+    return jsonify(debug_info)
 
 @app.route('/api/conversations', methods=['GET'])
 @require_auth
