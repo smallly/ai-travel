@@ -19,7 +19,11 @@
       "Bash(docker build:*)",
       "Bash(railway --version)",
       "Bash(npm install:*)",
-      "Bash(railway login:*)"
+      "Bash(railway login:*)",
+      "WebFetch(domain:ai-travel-production-51a6.up.railway.app)",
+      "WebFetch(domain:ai-travel-6ilc.onrender.com)",
+      "Bash(curl:*)",
+      "Bash(npm run build:*)"
     ],
     "deny": [],
     "ask": []

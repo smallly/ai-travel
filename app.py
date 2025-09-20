@@ -10,7 +10,7 @@ import requests
 import re
 import os
 from datetime import datetime
-from flask import Flask, request, jsonify, g
+from flask import Flask, request, jsonify, g, send_from_directory, send_file
 from flask_cors import CORS
 from logging.handlers import RotatingFileHandler
 import pytz
@@ -1043,14 +1043,56 @@ def update_user_profile():
             'error': str(e)
         }), 500
 
+# 静态文件服务
+@app.route('/')
+def serve_frontend():
+    """提供前端首页"""
+    try:
+        return send_file('dist/index.html')
+    except FileNotFoundError:
+        return jsonify({
+            'success': False,
+            'error': '前端文件未找到，请先运行 npm run build',
+            'message': 'AI旅行助手API服务正常运行'
+        }), 404
+
+@app.route('/<path:path>')
+def serve_static_files(path):
+    """提供静态文件服务"""
+    try:
+        # 先尝试从dist目录提供文件
+        return send_from_directory('dist', path)
+    except FileNotFoundError:
+        # 如果是前端路由，返回index.html
+        try:
+            return send_file('dist/index.html')
+        except FileNotFoundError:
+            return jsonify({
+                'success': False,
+                'error': f'文件未找到: {path}',
+                'message': 'AI旅行助手API服务正常运行'
+            }), 404
+
 # 错误处理
 @app.errorhandler(404)
 def not_found_error(error):
-    return jsonify({
-        'success': False,
-        'error': 'API接口不存在',
-        'code': 404
-    }), 404
+    # 如果是API请求，返回JSON错误
+    if request.path.startswith('/api/'):
+        return jsonify({
+            'success': False,
+            'error': 'API接口不存在',
+            'code': 404
+        }), 404
+
+    # 否则尝试提供前端页面
+    try:
+        return send_file('dist/index.html')
+    except FileNotFoundError:
+        return jsonify({
+            'success': False,
+            'error': '前端文件未找到',
+            'code': 404
+        }), 404
 
 @app.errorhandler(500)
 def internal_error(error):
