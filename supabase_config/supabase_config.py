@@ -40,11 +40,11 @@ class SupabaseConfig:
     MAX_FILE_SIZE: int = 5 * 1024 * 1024  # 5MB
     
     def __post_init__(self):
-        """配置验证"""
+        """配置验证 - 改为非强制性验证，避免线上部署失败"""
         if not self.PROJECT_URL:
-            raise ValueError("SUPABASE_URL环境变量未设置")
+            print("WARNING: SUPABASE_URL环境变量未设置")
         if not self.PROJECT_KEY:
-            raise ValueError("SUPABASE_ANON_KEY环境变量未设置")
+            print("WARNING: SUPABASE_ANON_KEY环境变量未设置")
     
     @property
     def is_configured(self) -> bool:

@@ -24,10 +24,10 @@ from utils.auth_utils import PasswordManager, TokenManager, token_required, vali
 # 导入Supabase客户端
 from utils.supabase_client import supabase_client, DatabaseResponse
 
-# 验证配置
+# 验证配置 - 改为警告模式，不强制退出
 if not validate_all_configs():
-    print("❌ 配置验证失败，应用无法启动")
-    exit(1)
+    print("⚠️ 部分配置验证失败，应用将以降级模式启动")
+    print("📝 某些功能可能不可用，但基础服务仍可正常运行")
 
 # 创建Flask应用
 app = Flask(__name__)
@@ -583,11 +583,32 @@ def send_message():
         }), 500
 
 # 临时无认证AI对话端点（用于调试Supabase连接问题）
-@app.route('/api/chat/test', methods=['POST'])
+@app.route('/api/chat/test', methods=['POST', 'OPTIONS'])
 def test_chat():
     """临时无认证AI对话端点"""
+    # 处理OPTIONS预检请求
+    if request.method == 'OPTIONS':
+        response = jsonify({'status': 'ok'})
+        response.headers.add('Access-Control-Allow-Origin', '*')
+        response.headers.add('Access-Control-Allow-Headers', 'Content-Type,Authorization')
+        response.headers.add('Access-Control-Allow-Methods', 'POST,OPTIONS')
+        return response
+
     try:
-        data = request.get_json()
+        # 获取JSON数据，处理请求解析问题
+        if not request.is_json:
+            return jsonify({
+                'success': False,
+                'error': '请求必须是JSON格式'
+            }), 400
+
+        data = request.get_json(force=True)
+        if not data:
+            return jsonify({
+                'success': False,
+                'error': '请求数据为空'
+            }), 400
+
         message_content = data.get('message', '').strip()
 
         if not message_content:
@@ -610,7 +631,7 @@ def test_chat():
 
             app.logger.info(f'✅ 临时测试AI回复成功: {ai_content[:100]}...')
 
-            return jsonify({
+            response_data = {
                 'success': True,
                 'data': {
                     'ai_message': {
@@ -619,19 +640,27 @@ def test_chat():
                     },
                     'attractions': attractions
                 }
-            })
+            }
+
+            response = jsonify(response_data)
+            response.headers.add('Access-Control-Allow-Origin', '*')
+            return response
         else:
-            return jsonify({
+            error_response = jsonify({
                 'success': False,
                 'error': f"AI服务暂时不可用：{result.get('error', '未知错误')}"
-            }), 500
+            })
+            error_response.headers.add('Access-Control-Allow-Origin', '*')
+            return error_response, 500
 
     except Exception as e:
         app.logger.error(f'💥 临时测试AI对话失败: {str(e)}')
-        return jsonify({
+        error_response = jsonify({
             'success': False,
-            'error': str(e)
-        }), 500
+            'error': f'服务器错误: {str(e)}'
+        })
+        error_response.headers.add('Access-Control-Allow-Origin', '*')
+        return error_response, 500
 
 # 用户认证路由
 @app.route('/api/auth/register', methods=['POST'])

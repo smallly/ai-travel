@@ -47,16 +47,35 @@ class SupabaseClient:
         if not SUPABASE_AVAILABLE:
             self.logger.error("Supabase library not installed")
             return
-        
+
         try:
-            if not supabase_config.is_configured:
-                self.logger.error("Supabase configuration incomplete")
+            # 更详细的配置检查
+            url = os.getenv('SUPABASE_URL')
+            key = os.getenv('SUPABASE_ANON_KEY')
+
+            if not url:
+                self.logger.error("SUPABASE_URL environment variable not set")
                 return
-            
-            config = supabase_config.get_client_config()
-            self.client = create_client(config['url'], config['key'])
-            self.logger.info("Supabase client initialized successfully")
-            
+            if not key:
+                self.logger.error("SUPABASE_ANON_KEY environment variable not set")
+                return
+
+            self.logger.info(f"Initializing Supabase client with URL: {url[:30]}...")
+
+            # 直接使用环境变量而不是配置类
+            self.client = create_client(url, key)
+            self.logger.info("✅ Supabase client initialized successfully")
+
+            # 立即测试连接
+            test_result = self.test_connection()
+            if test_result.success:
+                self.logger.info("✅ Supabase connection test passed")
+            else:
+                self.logger.warning(f"⚠️ Supabase connection test failed: {test_result.error}")
+
+        except ImportError as e:
+            self.logger.error(f"Supabase import error: {str(e)}")
+            self.client = None
         except Exception as e:
             self.logger.error(f"Supabase client initialization failed: {str(e)}")
             self.client = None
