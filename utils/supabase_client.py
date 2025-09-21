@@ -20,10 +20,7 @@ except ImportError:
     SUPABASE_AVAILABLE = False
     print("WARNING: Supabase library not installed. Run: pip install supabase")
 
-import sys
-import os
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from supabase_config.supabase_config import supabase_config
+# 移除循环引用，直接使用环境变量
 
 @dataclass
 class DatabaseResponse:

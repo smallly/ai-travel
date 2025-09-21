@@ -582,6 +582,51 @@ def send_message():
             'error': str(e)
         }), 500
 
+# Supabase连接测试端点
+@app.route('/api/debug/supabase-direct', methods=['GET'])
+def debug_supabase_direct():
+    """直接测试Supabase连接"""
+    try:
+        # 直接导入并测试Supabase
+        from supabase import create_client
+
+        url = os.getenv('SUPABASE_URL')
+        key = os.getenv('SUPABASE_ANON_KEY')
+
+        if not url or not key:
+            return jsonify({
+                'success': False,
+                'error': 'Environment variables missing',
+                'url_exists': bool(url),
+                'key_exists': bool(key)
+            })
+
+        # 尝试创建客户端
+        client = create_client(url, key)
+
+        # 尝试简单查询
+        result = client.table('users').select('count').limit(1).execute()
+
+        return jsonify({
+            'success': True,
+            'message': 'Supabase connection successful',
+            'client_created': True,
+            'query_result': bool(result)
+        })
+
+    except ImportError as e:
+        return jsonify({
+            'success': False,
+            'error': f'Import error: {str(e)}',
+            'supabase_available': False
+        })
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': f'Connection error: {str(e)}',
+            'supabase_available': True
+        })
+
 # 简单测试端点 - 不依赖JSON解析
 @app.route('/api/simple/test', methods=['GET'])
 def simple_test():
