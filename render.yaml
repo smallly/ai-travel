@@ -31,3 +31,5 @@ services:
         value: 0dede431b9b3bb68ab94d26b0d6c7142
       - key: TIMEZONE
         value: Asia/Shanghai
+      - key: FRONTEND_URL
+        value: https://ai-travel-6ilc.onrender.com
