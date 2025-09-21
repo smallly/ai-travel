@@ -582,6 +582,32 @@ def send_message():
             'error': str(e)
         }), 500
 
+# 调试端点 - 查看请求详情
+@app.route('/api/debug/request', methods=['POST', 'GET', 'OPTIONS'])
+def debug_request():
+    """调试请求信息"""
+    debug_info = {
+        'method': request.method,
+        'headers': dict(request.headers),
+        'content_type': request.content_type,
+        'is_json': request.is_json,
+        'data': None,
+        'args': dict(request.args),
+        'form': dict(request.form),
+        'remote_addr': request.remote_addr
+    }
+
+    try:
+        if request.method == 'POST':
+            if request.is_json:
+                debug_info['data'] = request.get_json()
+            else:
+                debug_info['raw_data'] = request.get_data(as_text=True)[:500]
+    except Exception as e:
+        debug_info['error'] = str(e)
+
+    return jsonify(debug_info)
+
 # 临时无认证AI对话端点（用于调试Supabase连接问题）
 @app.route('/api/chat/test', methods=['POST', 'OPTIONS'])
 def test_chat():
@@ -595,18 +621,20 @@ def test_chat():
         return response
 
     try:
-        # 获取JSON数据，处理请求解析问题
-        if not request.is_json:
-            return jsonify({
-                'success': False,
-                'error': '请求必须是JSON格式'
-            }), 400
+        # 更宽松的JSON解析
+        data = None
+        try:
+            data = request.get_json(force=True, silent=True)
+        except:
+            try:
+                data = request.get_json()
+            except:
+                pass
 
-        data = request.get_json(force=True)
         if not data:
             return jsonify({
                 'success': False,
-                'error': '请求数据为空'
+                'error': '无法解析JSON数据'
             }), 400
 
         message_content = data.get('message', '').strip()
