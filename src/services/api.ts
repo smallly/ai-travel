@@ -6,15 +6,13 @@ const getApiBaseUrl = () => {
   }
 
   // 在生产环境下，使用当前域名
-  if (window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
+  if (typeof window !== 'undefined' && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
     return `${window.location.origin}/api`;
   }
 
   // 本地开发环境默认
   return 'http://localhost:5000/api';
 };
-
-const API_BASE_URL = getApiBaseUrl();
 
 // API响应类型定义
 export interface ApiResponse<T = any> {
@@ -116,7 +114,7 @@ interface RequestOptions extends RequestInit {
 // 通用请求函数
 async function request<T>(endpoint: string, options: RequestOptions = {}): Promise<ApiResponse<T>> {
   try {
-    const url = `${API_BASE_URL}${endpoint}`;
+    const url = `${getApiBaseUrl()}${endpoint}`;
     const { silent = false, ...fetchOptions } = options;
     
     // 获取认证token
