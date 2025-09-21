@@ -24,7 +24,8 @@
       "WebFetch(domain:ai-travel-6ilc.onrender.com)",
       "Bash(curl:*)",
       "Bash(npm run build:*)",
-      "Bash(nslookup:*)"
+      "Bash(nslookup:*)",
+      "Bash(git config:*)"
     ],
     "deny": [],
     "ask": []

@@ -20,7 +20,25 @@ except ImportError:
     SUPABASE_AVAILABLE = False
     print("WARNING: Supabase library not installed. Run: pip install supabase")
 
-# 移除循环引用，直接使用环境变量
+# 简化的配置类，避免循环引用
+class SimpleSupabaseConfig:
+    def __init__(self):
+        self.PROJECT_URL = os.getenv('SUPABASE_URL', '')
+        self.PROJECT_KEY = os.getenv('SUPABASE_ANON_KEY', '')
+        self.SERVICE_KEY = os.getenv('SUPABASE_SERVICE_KEY', '')
+
+    @property
+    def is_configured(self):
+        return bool(self.PROJECT_URL and self.PROJECT_KEY)
+
+    def get_client_config(self):
+        return {
+            'url': self.PROJECT_URL,
+            'key': self.PROJECT_KEY
+        }
+
+# 实例化简化配置
+simple_config = SimpleSupabaseConfig()
 
 @dataclass
 class DatabaseResponse:
@@ -46,21 +64,14 @@ class SupabaseClient:
             return
 
         try:
-            # 更详细的配置检查
-            url = os.getenv('SUPABASE_URL')
-            key = os.getenv('SUPABASE_ANON_KEY')
-
-            if not url:
-                self.logger.error("SUPABASE_URL environment variable not set")
-                return
-            if not key:
-                self.logger.error("SUPABASE_ANON_KEY environment variable not set")
+            if not simple_config.is_configured:
+                self.logger.error("Supabase configuration incomplete")
                 return
 
-            self.logger.info(f"Initializing Supabase client with URL: {url[:30]}...")
+            config = simple_config.get_client_config()
+            self.logger.info(f"Initializing Supabase client with URL: {config['url'][:30]}...")
 
-            # 直接使用环境变量而不是配置类
-            self.client = create_client(url, key)
+            self.client = create_client(config['url'], config['key'])
             self.logger.info("✅ Supabase client initialized successfully")
 
             # 立即测试连接
