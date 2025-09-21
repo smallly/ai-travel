@@ -582,6 +582,39 @@ def send_message():
             'error': str(e)
         }), 500
 
+# 简单测试端点 - 不依赖JSON解析
+@app.route('/api/simple/test', methods=['GET'])
+def simple_test():
+    """简单测试端点"""
+    message = request.args.get('message', '你好，我想了解北京的旅游景点')
+
+    try:
+        app.logger.info(f'🔧 简单测试AI对话: {message[:50]}...')
+
+        # 直接调用Dify API
+        result = dify_service.send_message(message)
+
+        if result['success']:
+            dify_data = result['data']
+            ai_content = dify_data.get('answer', '抱歉，我暂时无法回答您的问题。')
+
+            return jsonify({
+                'success': True,
+                'message': message,
+                'response': ai_content[:200] + ('...' if len(ai_content) > 200 else ''),
+                'full_response': ai_content
+            })
+        else:
+            return jsonify({
+                'success': False,
+                'error': result.get('error', '未知错误')
+            })
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': f'异常: {str(e)}'
+        })
+
 # 调试端点 - 查看请求详情
 @app.route('/api/debug/request', methods=['POST', 'GET', 'OPTIONS'])
 def debug_request():
