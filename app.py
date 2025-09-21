@@ -582,6 +582,57 @@ def send_message():
             'error': str(e)
         }), 500
 
+# 临时无认证AI对话端点（用于调试Supabase连接问题）
+@app.route('/api/chat/test', methods=['POST'])
+def test_chat():
+    """临时无认证AI对话端点"""
+    try:
+        data = request.get_json()
+        message_content = data.get('message', '').strip()
+
+        if not message_content:
+            return jsonify({
+                'success': False,
+                'error': '消息不能为空'
+            }), 400
+
+        app.logger.info(f'🔧 临时测试AI对话: {message_content[:50]}...')
+
+        # 直接调用Dify API，不需要认证
+        result = dify_service.send_message(message_content)
+
+        if result['success']:
+            dify_data = result['data']
+            ai_content = dify_data.get('answer', '抱歉，我暂时无法回答您的问题。')
+
+            # 提取景点信息
+            attractions = dify_service.extract_attractions(ai_content)
+
+            app.logger.info(f'✅ 临时测试AI回复成功: {ai_content[:100]}...')
+
+            return jsonify({
+                'success': True,
+                'data': {
+                    'ai_message': {
+                        'content': ai_content,
+                        'created_at': datetime.now().isoformat()
+                    },
+                    'attractions': attractions
+                }
+            })
+        else:
+            return jsonify({
+                'success': False,
+                'error': f"AI服务暂时不可用：{result.get('error', '未知错误')}"
+            }), 500
+
+    except Exception as e:
+        app.logger.error(f'💥 临时测试AI对话失败: {str(e)}')
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
 # 用户认证路由
 @app.route('/api/auth/register', methods=['POST'])
 def register_with_phone():
