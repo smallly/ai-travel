@@ -190,7 +190,7 @@ const PhoneAuthModal: React.FC<PhoneAuthModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 px-4">
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[9999] px-4">
       <div className="bg-white rounded-2xl p-6 w-full max-w-sm relative">
         {/* 关闭按钮 */}
         <button

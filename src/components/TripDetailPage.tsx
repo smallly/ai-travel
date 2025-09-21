@@ -228,7 +228,7 @@ const TripDetailPage: React.FC<TripDetailPageProps> = ({
 
         {/* 地图区域 */}
         <div className="px-4 mb-6">
-          <div className={`relative ${isMapFullscreen ? 'fixed inset-0 z-50' : 'h-48'} overflow-hidden transition-all duration-300 rounded-2xl`}>
+          <div className={`relative ${isMapFullscreen ? 'fixed inset-0 z-[9999]' : 'h-48'} overflow-hidden transition-all duration-300 rounded-2xl`}>
             {/* 地图组件 */}
             <RealMap 
               locations={

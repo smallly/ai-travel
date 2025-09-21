@@ -23,7 +23,8 @@
       "WebFetch(domain:ai-travel-production-51a6.up.railway.app)",
       "WebFetch(domain:ai-travel-6ilc.onrender.com)",
       "Bash(curl:*)",
-      "Bash(npm run build:*)"
+      "Bash(npm run build:*)",
+      "Bash(nslookup:*)"
     ],
     "deny": [],
     "ask": []

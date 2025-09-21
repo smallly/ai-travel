@@ -327,7 +327,7 @@ def debug_supabase():
         'supabase_anon_key': bool(os.getenv('SUPABASE_ANON_KEY')),
         'supabase_service_key': bool(os.getenv('SUPABASE_SERVICE_KEY')),
         'client_initialized': supabase_client.is_connected(),
-        'config_valid': supabase_config.is_configured
+        'config_valid': supabase_client.is_connected()
     }
 
     # 尝试连接测试

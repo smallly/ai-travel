@@ -104,44 +104,94 @@ const FormInput = React.memo<{
   return prevProps.disabled === nextProps.disabled;
 });
 
-// 独立的输入框组件，完全隔离在主组件外部
-const ChatInput = React.memo<{
+// 简单的输入框组件
+const ChatInput: React.FC<{
   onSendMessage: (message: string) => void;
   disabled: boolean;
-}>(({ onSendMessage, disabled }) => {
-  const [inputValue, setInputValue] = useState('');
-  const inputRef = useRef<HTMLInputElement>(null);
+  isAuthenticated?: boolean; // 添加登录状态参数
+}> = ({ onSendMessage, disabled, isAuthenticated }) => {
+  const [message, setMessage] = useState(() => {
+    // 初始化时从localStorage恢复保存的输入
+    const savedInput = localStorage.getItem('chatInput');
+    console.log('🔄 ChatInput组件初始化，localStorage内容:', savedInput);
+    return savedInput || '';
+  });
 
-  const handleSubmit = useCallback(() => {
-    if (inputValue.trim()) {
-      onSendMessage(inputValue);
-      setInputValue('');
-      // 保持焦点
-      setTimeout(() => {
-        inputRef.current?.focus();
-      }, 0);
+  // 标记组件是否已经初始化完成
+  const [isInitialized, setIsInitialized] = useState(false);
+
+  // 组件初始化完成标记
+  useEffect(() => {
+    setIsInitialized(true);
+  }, []);
+
+  // 监听message状态的所有变化
+  useEffect(() => {
+    console.log('📄 message状态变化:', message, '长度:', message.length);
+  }, [message]);
+
+  // 监听登录状态变化，登录后恢复保存的内容
+  useEffect(() => {
+    console.log('📝 登录状态变化检查 - isAuthenticated:', isAuthenticated);
+    if (isAuthenticated) {
+      const savedInput = localStorage.getItem('chatInput');
+      console.log('🔍 登录后检查localStorage:', savedInput, '当前输入:', message);
+      if (savedInput) {
+        if (savedInput !== message) {
+          console.log('✅ 恢复保存的输入内容:', savedInput);
+          setMessage(savedInput);
+        } else {
+          console.log('ℹ️ 输入框内容已经与localStorage一致，无需恢复');
+        }
+      } else {
+        console.log('⚠️ localStorage中没有保存的输入内容');
+      }
     }
-  }, [inputValue, onSendMessage]);
+  }, [isAuthenticated]); // 只依赖登录状态，避免无限循环
 
-  const handleKeyPress = useCallback((e: React.KeyboardEvent<HTMLInputElement>) => {
+  // 实时同步输入内容到localStorage，支持用户编辑
+  useEffect(() => {
+    // 只有在组件初始化完成后才进行同步，避免初始化时误清空localStorage
+    if (!isInitialized) return;
+
+    // 只有当内容有变化时才更新localStorage
+    const savedInput = localStorage.getItem('chatInput');
+    if (message !== savedInput) {
+      if (message.trim() === '') {
+        // 用户手动清空了输入框，清理localStorage
+        console.log('🗑️ 用户清空输入框，清理localStorage');
+        localStorage.removeItem('chatInput');
+      } else {
+        // 用户正在编辑，保存到localStorage
+        console.log('💾 保存用户编辑内容到localStorage:', message);
+        localStorage.setItem('chatInput', message);
+      }
+    }
+  }, [message, isInitialized]);
+
+  const handleSubmit = () => {
+    if (message.trim()) {
+      onSendMessage(message);
+      setMessage('');
+      // 清理localStorage，避免重复恢复
+      localStorage.removeItem('chatInput');
+    }
+  };
+
+  const handleKeyPress = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       handleSubmit();
     }
-  }, [handleSubmit]);
-
-  const handleChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    setInputValue(e.target.value);
-  }, []);
+  };
 
   return (
     <div className="flex gap-3 items-end">
       <div className="flex-1 relative">
         <input
-          ref={inputRef}
           type="text"
-          value={inputValue}
-          onChange={handleChange}
+          value={message}
+          onChange={(e) => setMessage(e.target.value)}
           onKeyDown={handleKeyPress}
           placeholder="发送链接或咨询旅行问题..."
           disabled={disabled}
@@ -152,17 +202,15 @@ const ChatInput = React.memo<{
       <button
         type="button"
         onClick={handleSubmit}
-        disabled={!inputValue.trim() || disabled}
+        disabled={!message.trim() || disabled}
         className="bg-gradient-to-r from-purple-500 to-blue-500 text-white p-3 rounded-2xl hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed transition-all"
       >
         <Send className="w-5 h-5" />
       </button>
     </div>
   );
-}, (prevProps, nextProps) => {
-  // 自定义比较函数，确保只有真正变化时才重新渲染
-  return prevProps.disabled === nextProps.disabled;
-});
+};
+
 
 // 城市坐标映射表
 const CITY_COORDINATES: { [key: string]: { lat: number; lng: number; radius: number } } = {
@@ -388,6 +436,7 @@ function AppContent() {
   const [currentConversationId, setCurrentConversationId] = useState<string | null>(null);
   const [conversationTitle, setConversationTitle] = useState('新对话');
   const [showConversationHistory, setShowConversationHistory] = useState(false);
+  // 保存登录前的输入内容
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [conversations, setConversations] = useState<unknown[]>([]);
   // 已添加至行程的消息ID集合（仅在当前会话有效）
@@ -561,8 +610,8 @@ function AppContent() {
       // 如果有历史对话，延迟滚动到底部确保DOM已渲染
       if (chatHistory.length > 1) { // 大于1是因为总是包含欢迎消息
         setTimeout(() => {
-          scrollToBottom(true, false);
-        }, 100);
+          scrollToBottom(true, true); // 使用平滑滚动，提升用户体验
+        }, 300); // 增加延迟时间，确保DOM完全渲染和登录状态稳定
       }
     } else if (!isAuthenticated) {
       // 非登录用户也恢复匿名对话历史
@@ -572,7 +621,7 @@ function AppContent() {
       // 如果有历史对话，延迟滚动到底部
       if (anonymousHistory.length > 1) {
         setTimeout(() => {
-          scrollToBottom(true, false);
+          scrollToBottom(true, true); // 使用平滑滚动，提升用户体验
         }, 100);
       }
     }
@@ -934,11 +983,17 @@ function AppContent() {
   const handleSendMessage = useCallback(async (messageText: string) => {
     // 检查用户是否已登录
     if (!isAuthenticated) {
+      // 保存用户输入的内容，等登录后可以继续使用
+      console.log('💾 保存用户输入到localStorage:', messageText);
+      localStorage.setItem('chatInput', messageText);
       setShowLoginModal(true);
       return;
     }
 
     // 移除离线模式检查，让后端处理所有情况（包括使用本地模拟回复）
+
+    // 清空保存的消息内容，因为现在要发送了
+    localStorage.removeItem('chatInput');
 
     // 检测是否为链接
     const sourceLink = isValidUrl(messageText) ? messageText : undefined;
@@ -1140,6 +1195,9 @@ function AppContent() {
 
     // 重置对话记录为默认欢迎消息
     setMessages([getWelcomeMessage()]);
+
+    // 清空用户行程数据
+    setUserTrips([]);
 
     setShowLogoutConfirm(false);
     // 不改变当前页面，用户退出登录后停留在原页面
@@ -1585,7 +1643,12 @@ function AppContent() {
 
       {/* 输入区域 */}
       <div className="bg-white/90 backdrop-blur-sm border-t border-gray-200/50 p-4 safe-area-bottom">
-        <ChatInput onSendMessage={handleSendMessage} disabled={isTyping} />
+        <ChatInput
+          key="chat-input-persistent"
+          onSendMessage={handleSendMessage}
+          disabled={isTyping}
+          isAuthenticated={isAuthenticated}
+        />
       </div>
     </div>
   );
@@ -1718,10 +1781,10 @@ function AppContent() {
           </div>
         </div>
 
-        {/* 规划中页面 - 直接显示，不需要条件判断 */}
+        {/* 规划中页面 - 添加登录状态检查 */}
         <div className="flex-1 p-4 overflow-y-auto custom-scrollbar">
           <div className="space-y-3">
-            {travelPlans
+            {isAuthenticated && travelPlans
               .filter(plan => plan.status === 'planning')
               .map((plan) => {
                 const swipeState = swipeStates[plan.id] || { offset: 0, isDeleting: false };
@@ -1783,7 +1846,7 @@ function AppContent() {
                 );
               })}
 
-            {travelPlans.filter(plan => plan.status === 'planning').length === 0 && (
+            {(!isAuthenticated || travelPlans.filter(plan => plan.status === 'planning').length === 0) && (
               <div className="text-center py-12">
                 <div className="w-16 h-16 bg-gray-50 rounded-full flex items-center justify-center mx-auto mb-4 shadow-sm">
                   <Calendar className="w-8 h-8 text-gray-400" />
@@ -2084,6 +2147,14 @@ function AppContent() {
         onAuthSuccess={() => {
           setShowLoginModal(false);
           showToast('登录成功！');
+
+          // 登录成功后，确保在对话页面并滚动到最后一条消息
+          setCurrentTab('chat');
+
+          // 延迟滚动，确保登录状态已更新和DOM已渲染
+          setTimeout(() => {
+            scrollToBottom(true, true); // 强制滚动到底部，使用平滑滚动
+          }, 200);
         }}
       />
 
