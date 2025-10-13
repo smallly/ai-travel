@@ -1,5 +1,14 @@
 # 修订日志 (CHANGELOG)
 
+## [2025-10-13 运维更新] - Render 免费实例保活 🔄
+
+### 新增内容 (Added)
+
+- **⚙️ GitHub Actions 保活工作流**
+  - **新增文件**: `.github/workflows/keep-render-alive.yml`，每 10 分钟定时 `curl` Render 健康检查接口，避免免费实例休眠
+  - **配置提示**: 需在仓库 `Settings → Secrets and variables → Actions` 添加 `RENDER_PING_URL`，指向生产环境健康检查地址（例如 `https://xxx.onrender.com/api/health`）
+  - **可选操作**: 支持 `workflow_dispatch` 手动触发，用于临时验证保活效果
+
 ## [2025-09-08 重要更新] - 行程板块界面优化 🎯
 
 ### 新增功能 (Added)

@@ -1,0 +1,26 @@
+name: Keep Render App Awake
+
+on:
+  schedule:
+    - cron: "*/10 * * * *"
+  workflow_dispatch:
+
+jobs:
+  ping:
+    name: Ping Render Health Endpoint
+    runs-on: ubuntu-latest
+    env:
+      RENDER_PING_URL: ${{ secrets.RENDER_PING_URL }}
+    steps:
+      - name: Fail if Render URL is missing
+        run: |
+          if [ -z "${RENDER_PING_URL}" ]; then
+            echo "Missing secrets.RENDER_PING_URL. Please add it in your repository settings."
+            exit 1
+          fi
+      - name: Curl Render health endpoint
+        run: |
+          set -e
+          echo "Pinging ${RENDER_PING_URL}"
+          curl -fsS --retry 3 --retry-connrefused --max-time 20 "${RENDER_PING_URL}"
+          echo "Ping succeeded"
